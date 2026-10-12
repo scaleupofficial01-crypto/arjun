@@ -41,8 +41,14 @@ export default function Home() {
           math behind your performance, sync MT5, and meet with your trading
           circle without leaving the app.
         </p>
-        <div className="mt-10 flex justify-center gap-4">
-          <Link href="/register" className="btn-primary">Start your empire</Link>
+        <div className="mt-10 flex justify-center gap-4 flex-wrap">
+          {process.env.DEMO_MODE === "true" ? (
+            <Link href="/dashboard" className="btn-primary">
+              Open dashboard — demo preview (no login)
+            </Link>
+          ) : (
+            <Link href="/register" className="btn-primary">Start your empire</Link>
+          )}
           <Link href="/login" className="px-4 py-2.5 rounded-lg border border-[var(--color-border)] hover:border-[var(--color-accent)]">
             Log in
           </Link>

@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { getCurrentUser } from "@/lib/session";
 import { integrationStatus } from "@/lib/env";
+import { DEMO_MODE, DEMO_USER } from "@/lib/demo";
 import { LogoutButton, LogoutEverywhereButton } from "@/components/logout-buttons";
 
 export const metadata = { title: "Dashboard — Empire" };
@@ -32,12 +34,22 @@ const modules = [
 ];
 
 export default async function DashboardPage() {
-  const user = await getCurrentUser();
+  const sessionUser = await getCurrentUser();
+  // Demo mode (local preview only): no session → render with demo identity.
+  const isDemo = !sessionUser && DEMO_MODE;
+  const user = sessionUser ?? (DEMO_MODE ? DEMO_USER : null);
   if (!user) redirect("/login");
   const integ = integrationStatus();
 
   return (
     <main className="min-h-screen max-w-6xl mx-auto px-6 py-8 space-y-8">
+      {isDemo && (
+        <div className="card p-4 border-amber-500/40 bg-amber-500/5 text-sm">
+          <span className="badge badge-demo mr-2">Demo preview</span>
+          Login is bypassed in this preview build (DEMO_MODE). Production keeps
+          full auth. <Link className="underline text-[var(--color-accent)]" href="/">Back to landing</Link>
+        </div>
+      )}
       <header className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">
@@ -45,15 +57,17 @@ export default async function DashboardPage() {
           </h1>
           <p className="text-sm text-[var(--color-muted)]">
             {user.displayName} · {user.email} · role: {user.role.toLowerCase()}
-            {!user.emailVerifiedAt && (
+            {!user.emailVerifiedAt && !isDemo && (
               <span className="badge badge-setup ml-2">email not verified</span>
             )}
           </p>
         </div>
-        <div className="flex gap-2">
-          <LogoutEverywhereButton />
-          <LogoutButton />
-        </div>
+        {!isDemo && (
+          <div className="flex gap-2">
+            <LogoutEverywhereButton />
+            <LogoutButton />
+          </div>
+        )}
       </header>
 
       <section className="card p-5">

@@ -26,6 +26,8 @@ commit. When a new key is added: real value → `.env`, empty key name →
 | `NEXT_PUBLIC_APP_URL` | Canonical app URL (OAuth redirects, emails) | Client + server |
 | `CRON_SECRET` | Protecting cron/alert routes (price alerts fire from real data only) | Route guards |
 
+| `DEMO_MODE` | **Local preview only** — bypasses login on protected pages. Never set in production. | Server components |
+
 ## Notes
 - TradingView: free **Advanced Chart embed widget** (`embed-widget-advanced-chart.js`,
   not legacy `tv.js`) — no API key needed (bug #4).

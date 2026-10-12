@@ -124,10 +124,14 @@ export async function getCurrentUser(): Promise<User | null> {
 
 export async function setSessionCookie(token: string, expiresAt: Date) {
   const store = await cookies();
+  const isProd = process.env.NODE_ENV === "production";
   store.set(SESSION_COOKIE, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    secure: isProd,
+    // Production: SameSite=None+Secure so the session also works when the app
+    // is embedded (e.g. cross-site preview iframes). CSRF is still enforced
+    // via explicit origin checks on every mutating route (§5).
+    sameSite: isProd ? "none" : "lax",
     path: "/",
     expires: expiresAt,
   });

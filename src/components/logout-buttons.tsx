@@ -1,35 +1,27 @@
-"use client";
-
-import { useRouter } from "next/navigation";
-
+/** Native form logout buttons — work without client-side JS. */
 export function LogoutButton() {
-  const router = useRouter();
   return (
-    <button
-      className="px-3 py-1.5 text-sm rounded-lg border border-[var(--color-border)] hover:border-[var(--color-accent)]"
-      onClick={async () => {
-        await fetch("/api/auth/logout", { method: "POST" });
-        router.push("/");
-        router.refresh();
-      }}
-    >
-      Log out
-    </button>
+    <form action="/api/auth/logout-form" method="POST" className="inline">
+      <button
+        type="submit"
+        className="px-3 py-1.5 text-sm rounded-lg border border-[var(--color-border)] hover:border-[var(--color-accent)]"
+      >
+        Log out
+      </button>
+    </form>
   );
 }
 
 export function LogoutEverywhereButton() {
-  const router = useRouter();
   return (
-    <button
-      className="px-3 py-1.5 text-sm rounded-lg border border-[var(--color-loss)] text-[var(--color-loss)] hover:bg-[var(--color-loss)] hover:text-white"
-      onClick={async () => {
-        await fetch("/api/auth/logout-all", { method: "POST" });
-        router.push("/");
-        router.refresh();
-      }}
-    >
-      Sign out everywhere
-    </button>
+    <form action="/api/auth/logout-form" method="POST" className="inline">
+      <input type="hidden" name="scope" value="all" />
+      <button
+        type="submit"
+        className="px-3 py-1.5 text-sm rounded-lg border border-[var(--color-loss)] text-[var(--color-loss)] hover:bg-[var(--color-loss)] hover:text-white"
+      >
+        Sign out everywhere
+      </button>
+    </form>
   );
 }

@@ -1,0 +1,82 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: #0a0f1a;
+  --color-panel: #111827;
+  --color-panel-2: #1f2937;
+  --color-border: #273449;
+  --color-foreground: #e5e7eb;
+  --color-muted: #9ca3af;
+  --color-accent: #f59e0b;
+  --color-profit: #22c55e;
+  --color-loss: #ef4444;
+  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), monospace;
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+}
+
+.card {
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 0.75rem;
+}
+
+.input {
+  width: 100%;
+  background: var(--color-panel-2);
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  padding: 0.625rem 0.75rem;
+  color: var(--color-foreground);
+  outline: none;
+}
+.input:focus {
+  border-color: var(--color-accent);
+}
+
+.btn-primary {
+  background: var(--color-accent);
+  color: #0a0f1a;
+  font-weight: 600;
+  border-radius: 0.5rem;
+  padding: 0.625rem 1rem;
+  transition: opacity 0.15s;
+  cursor: pointer;
+}
+.btn-primary:hover {
+  opacity: 0.9;
+}
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.7rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 9999px;
+  border: 1px solid var(--color-border);
+}
+.badge-setup {
+  color: #fbbf24;
+  border-color: #f59e0b55;
+  background: #f59e0b11;
+}
+.badge-live {
+  color: #4ade80;
+  border-color: #22c55e55;
+  background: #22c55e11;
+}
+.badge-demo {
+  color: #93c5fd;
+  border-color: #3b82f655;
+  background: #3b82f611;
+}

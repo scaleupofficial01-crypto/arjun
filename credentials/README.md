@@ -28,6 +28,8 @@ commit. When a new key is added: real value → `.env`, empty key name →
 
 | `DEMO_MODE` | **Local preview only** — bypasses login on protected pages. Never set in production. | Server components |
 
+| `GITHUB_TOKEN` | Pushing commits to the GitHub repo (§2) | git remote auth, local only — never committed (lives in .git/config, snapshot-excluded) |
+
 ## Notes
 - TradingView: free **Advanced Chart embed widget** (`embed-widget-advanced-chart.js`,
   not legacy `tv.js`) — no API key needed (bug #4).

@@ -53,8 +53,9 @@ See [`docs/ERROR-LOG.md`](docs/ERROR-LOG.md) for the running defect log and
 known-bug preventions.
 
 ## Roadmap (from master prompt)
-1. ✅ **Phase 1 — auth & permissions** (this state; details below)
-2. Phase 2 — journal, calendar, analytics, charts with persistent drawings
+1. ✅ **Phase 1 — auth & permissions**
+2. ✅ **Phase 2 — journal, calendar, analytics, charts + persistent drawings,
+   watchlists & alerts**
 3. Phase 3 — MT5 sync (read-only bridge)
 4. Phase 4 — messenger
 5. Phase 5 — Empire Meet + 3D meet dashboard
@@ -66,3 +67,34 @@ and graceful degradation, "sign out everywhere", email verification +
 password reset tokens (Resend when configured; honest setup-required state
 when not), Google Sign-In with OAuth+PKCE (visible setup-required when
 unconfigured), CSRF/origin checks, rate limits on auth routes.
+
+### Phase 2 works today
+- **Trading Journal** (`/journal`): multiple journals, groups, full trade CRUD
+  (entry/exit/risk/fees/setup tags/notes/screenshots), CSV + Excel import/export
+  (pnl always recomputed server-side), delete journal / entry / group / group's
+  entries. Ownership enforced in every query.
+- **Live Charts** (`/charts`): TradingView `embed-widget-advanced-chart.js` in a
+  `tradingview-widget-container` (bug #4 compliant). Drawings captured from the
+  widget store and persisted server-side per user per symbol — survive refresh,
+  re-login, device switch; removed only by explicit delete. Data labeled
+  live/delayed.
+- **Calendar** (`/calendar`): daily P&L heatmap + monthly totals, computed only
+  from stored closed trades; click a day for its entries.
+- **Analytics** (`/analytics`): win rate, expectancy, profit factor, max
+  drawdown vs true historical peak, equity curve (SVG), per-instrument
+  breakdown. Unit-tested math (`tests/analytics.test.ts`).
+- **Watchlists & Alerts** (`/watchlists`): multiple watchlists, real prices
+  (Coinbase live spot for crypto, Frankfurter/ECB daily for forex — labeled;
+  listed equities show honest "unsupported on free tier" instead of fake
+  prices). Alerts fire only from real fetched prices, idempotently, and create
+  notifications (`/notifications`, 🔔 in nav).
+- **Alert scheduling**: production = Vercel Cron `GET /api/cron/alerts` daily on
+  free Hobby tier (`vercel.json`; free tier allows daily runs). For every-minute
+  checks use a free external pinger (e.g. cron-job.org) hitting the same URL
+  with `Authorization: Bearer <CRON_SECRET>`. Preview uses
+  `scripts/alert-poller.sh`. "Check now" button also runs a real check on demand.
+
+### Demo mode (preview only)
+`DEMO_MODE=true` in `/credentials/.env` (never in production): protected pages
+render with a demo identity instead of redirecting to login, clearly labeled.
+

@@ -23,3 +23,26 @@ Running log of defects found/fixed. Read this before touching related code
      datasource points at pooled `DATABASE_URL`, migrations use `DIRECT_URL`.
   8. Post visibility: PRIVATE|GROUP|PUBLIC must be enforced server-side on
      every feed/post route. *(applies Phase 6)*
+
+## 2026-10-13 — Phase 2 build (journal/calendar/analytics/charts/watchlists+alerts)
+- Built per §3. TradingView uses embed-widget-advanced-chart.js inside
+  tradingview-widget-container (bug #4 rule followed).
+- Bug #4 adjacency: chart persistence via capture/restore of the widget's
+  localStorage store, mirrored server-side per user+symbol. If TradingView
+  changes storage internals, explicit "Save drawings now" still captures raw
+  store — monitor after TradingView widget updates.
+- SEC-FIX pattern reused everywhere: ownership (`userId` / join through
+  parent) enforced in WHERE clauses on all Phase-2 routes; verified by
+  cross-user test (intruder sees 0 trades, 404 on delete/attach attempts).
+- File export (.csv/.xlsx) streams only rows owned by the caller.
+- Alerts fire only from real fetched prices (Coinbase/Frankfurter); unsupported
+  symbols skipped; concurrent-fire guarded by updateMany(active:true).
+- vercel.json cron is daily — Vercel Hobby free tier only allows daily cron
+  runs; documented every-minute alternative in README (external free pinger +
+  Authorization bearer). Do not silently "fix" by upgrading plan (§0 approval).
+- Prisma 7 is installed by default on fresh installs — pinned to 6.19.0
+  deliberately (stable prisma-client-js + datasourceUrl override); /tmp npx
+  pulls v7 and fails on our schema, always use ./node_modules/.bin/prisma.
+- Sandbox quirks (not app bugs): node_modules + .next purged between sessions;
+  scripts/preview.sh self-heals; git needs identity re-set per session;
+  credentials/.env sourcing needs quoted values for '&' in URLs.

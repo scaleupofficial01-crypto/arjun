@@ -21,16 +21,16 @@ function Pill({ ok, label }: { ok: boolean; label: string }) {
 }
 
 const modules = [
-  { name: "Trading Journal", phase: "Phase 2", ready: false },
-  { name: "Live Charts", phase: "Phase 2", ready: false },
-  { name: "Calendar", phase: "Phase 2", ready: false },
-  { name: "Analytics", phase: "Phase 2", ready: false },
-  { name: "Watchlists & Alerts", phase: "Phase 2", ready: false },
-  { name: "MT5 Sync", phase: "Phase 3", ready: false },
-  { name: "Messenger", phase: "Phase 4", ready: false },
-  { name: "Empire Meet", phase: "Phase 5", ready: false },
-  { name: "Community", phase: "Phase 6", ready: false },
-  { name: "Admin", phase: "Phase 6", ready: false },
+  { name: "Trading Journal", href: "/journal", phase: null, ready: true },
+  { name: "Live Charts", href: "/charts", phase: null, ready: true },
+  { name: "Calendar", href: "/calendar", phase: null, ready: true },
+  { name: "Analytics", href: "/analytics", phase: null, ready: true },
+  { name: "Watchlists & Alerts", href: "/watchlists", phase: null, ready: true },
+  { name: "MT5 Sync", href: null, phase: "Phase 3", ready: false },
+  { name: "Messenger", href: null, phase: "Phase 4", ready: false },
+  { name: "Empire Meet", href: null, phase: "Phase 5", ready: false },
+  { name: "Community", href: null, phase: "Phase 6", ready: false },
+  { name: "Admin", href: null, phase: "Phase 6", ready: false },
 ];
 
 export default async function DashboardPage() {
@@ -94,12 +94,19 @@ export default async function DashboardPage() {
       </section>
 
       <section className="grid md:grid-cols-3 sm:grid-cols-2 gap-4">
-        {modules.map((m) => (
-          <div key={m.name} className="card p-5 opacity-90">
-            <h3 className="font-semibold">{m.name}</h3>
-            <span className="badge badge-setup mt-3">{m.phase} — coming soon</span>
-          </div>
-        ))}
+        {modules.map((m) =>
+          m.ready && m.href ? (
+            <Link key={m.name} href={m.href} className="card p-5 hover:border-[var(--color-accent)] transition">
+              <h3 className="font-semibold">{m.name}</h3>
+              <span className="badge badge-live mt-3">Live — open</span>
+            </Link>
+          ) : (
+            <div key={m.name} className="card p-5 opacity-90">
+              <h3 className="font-semibold">{m.name}</h3>
+              <span className="badge badge-setup mt-3">{m.phase} — coming soon</span>
+            </div>
+          ),
+        )}
       </section>
     </main>
   );

@@ -1,6 +1,7 @@
-// Empire — Prisma schema (Phase 1: auth & permissions)
-// Postgres via Supabase. Use the pooled URL (connection_limit≈10,
-// generous pool_timeout) for `url`, direct URL for migrations (bug #7).
+// Empire — Prisma schema (Phase 1 auth + Phase 2 journal/calendar/analytics/
+// charts/watchlists/alerts/notifications)
+// Postgres via Supabase. Pooled URL (connection_limit≈10, generous
+// pool_timeout) for `url`, direct URL for migrations (bug #7).
 
 generator client {
   provider = "prisma-client-js"
@@ -26,6 +27,12 @@ model User {
   oauthAccounts      OAuthAccount[]
   verificationTokens VerificationToken[]
   passwordResets     PasswordResetToken[]
+  journals           Journal[]
+  trades             Trade[]
+  watchlists         Watchlist[]
+  priceAlerts        PriceAlert[]
+  notifications      Notification[]
+  chartLayouts       ChartLayout[]
 
   @@map("users")
 }
@@ -37,7 +44,6 @@ enum Role {
 
 model Session {
   id        String    @id @default(cuid())
-  // Only the SHA-256 hash of the bearer token is stored — never the token.
   tokenHash String    @unique
   userId    String
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -52,12 +58,12 @@ model Session {
 }
 
 model VerificationToken {
-  id        String   @id @default(cuid())
-  tokenHash String   @unique
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt DateTime
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
   usedAt    DateTime?
 
   @@index([userId])
@@ -78,14 +84,177 @@ model PasswordResetToken {
 }
 
 model OAuthAccount {
-  id                String  @id @default(cuid())
-  provider          String // e.g. "google"
+  id                String   @id @default(cuid())
+  provider          String
   providerAccountId String
   userId            String
-  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt         DateTime @default(now())
 
   @@unique([provider, providerAccountId])
   @@index([userId])
   @@map("oauth_accounts")
+}
+
+// ---------- Phase 2: Trading Journal ----------
+
+model Journal {
+  id        String         @id @default(cuid())
+  userId    String
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  createdAt DateTime       @default(now())
+  groups    JournalGroup[]
+  trades    Trade[]
+
+  @@index([userId])
+  @@map("journals")
+}
+
+model JournalGroup {
+  id        String   @id @default(cuid())
+  journalId String
+  journal   Journal  @relation(fields: [journalId], references: [id], onDelete: Cascade)
+  name      String
+  createdAt DateTime @default(now())
+  trades    Trade[]
+
+  @@index([journalId])
+  @@map("journal_groups")
+}
+
+enum TradeSide {
+  BUY
+  SELL
+}
+
+enum TradeStatus {
+  OPEN
+  CLOSED
+}
+
+model Trade {
+  id         String        @id @default(cuid())
+  userId     String
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  journalId  String
+  journal    Journal       @relation(fields: [journalId], references: [id], onDelete: Cascade)
+  groupId    String?
+  group      JournalGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  symbol     String
+  side       TradeSide
+  // Money: Decimal precision everywhere (never float columns)
+  entryPrice Decimal       @db.Decimal(20, 8)
+  exitPrice  Decimal?      @db.Decimal(20, 8)
+  quantity   Decimal       @db.Decimal(20, 8)
+  risk       Decimal?      @db.Decimal(20, 8)
+  fees       Decimal       @default(0) @db.Decimal(20, 8)
+  // pnl computed server-side from stored entry/exit/qty/fees at write time.
+  pnl        Decimal?      @db.Decimal(20, 8)
+  status     TradeStatus   @default(CLOSED)
+  setupTag   String?
+  notes      String?
+  entryAt    DateTime      @default(now())
+  exitAt     DateTime?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  attachments Attachment[]
+
+  @@index([userId])
+  @@index([journalId])
+  @@index([groupId])
+  @@index([exitAt])
+  @@map("trades")
+}
+
+model Attachment {
+  id        String   @id @default(cuid())
+  tradeId   String
+  trade     Trade    @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  fileName  String
+  mime      String
+  size      Int
+  path      String // userId/tradeId/random — served only via ownership-checked route
+  createdAt DateTime @default(now())
+
+  @@index([tradeId])
+  @@map("attachments")
+}
+
+// ---------- Phase 2: Charts (persistent per-user per-symbol drawings) ----------
+
+model ChartLayout {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  symbol    String
+  data      Json // raw TradingView layout store captured client-side
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, symbol])
+  @@map("chart_layouts")
+}
+
+// ---------- Phase 2: Watchlists & Alerts ----------
+
+model Watchlist {
+  id        String          @id @default(cuid())
+  userId    String
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  createdAt DateTime        @default(now())
+  items     WatchlistItem[]
+
+  @@index([userId])
+  @@map("watchlists")
+}
+
+model WatchlistItem {
+  id          String    @id @default(cuid())
+  watchlistId String
+  watchlist   Watchlist @relation(fields: [watchlistId], references: [id], onDelete: Cascade)
+  symbol      String
+  note        String?
+  addedAt     DateTime  @default(now())
+
+  @@unique([watchlistId, symbol])
+  @@map("watchlist_items")
+}
+
+enum AlertCondition {
+  ABOVE
+  BELOW
+}
+
+model PriceAlert {
+  id             String         @id @default(cuid())
+  userId         String
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  symbol         String
+  condition      AlertCondition
+  targetPrice    Decimal        @db.Decimal(20, 8)
+  note           String?
+  active         Boolean        @default(true)
+  lastCheckedAt  DateTime?
+  triggeredAt    DateTime?
+  triggeredPrice Decimal?       @db.Decimal(20, 8)
+  createdAt      DateTime       @default(now())
+
+  @@index([userId])
+  @@index([active, symbol])
+  @@map("price_alerts")
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String // e.g. "price-alert"
+  title     String
+  body      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, createdAt])
+  @@map("notifications")
 }

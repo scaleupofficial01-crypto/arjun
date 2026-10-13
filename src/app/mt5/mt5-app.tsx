@@ -22,6 +22,37 @@ async function call<T>(url: string, init?: RequestInit): Promise<{ ok: boolean; 
   }
 }
 
+/** Step-by-step REAL terminal connection checklist (live origin + copy). */
+function ConnectGuide({ ingestUrl, appUrl }: { ingestUrl: string; appUrl: string }) {
+  const [open, setOpen] = useState(false);
+  const origin = appUrl || (typeof window !== "undefined" ? window.location.origin : "");
+  return (
+    <div className="card p-4 border-[var(--color-accent)]/50 space-y-2">
+      <button onClick={() => setOpen(!open)} className="flex w-full items-center justify-between text-left">
+        <span className="font-semibold text-sm">🖥️ Connect your REAL MT5 terminal — live checklist</span>
+        <span className="text-[var(--color-muted)] text-xs">{open ? "hide ▲" : "show ▼"}</span>
+      </button>
+      {open && (
+        <ol className="text-xs text-[var(--color-muted)] list-decimal ml-5 space-y-1.5">
+          <li>MT5 open karo (demo ya real — dono chalenge; bridge read-only hai, trade place karna <b>impossible</b> hai).</li>
+          <li>Tools → Options → <b>Expert Advisors</b> → tick <i>“Allow WebRequest for listed URL”</i> → add exactly:
+            <div className="flex items-center gap-2 mt-1">
+              <code className="px-2 py-0.5 rounded bg-black/40 text-[var(--color-accent)] select-all">{origin}</code>
+              <button className="text-[var(--color-accent)] underline" onClick={() => navigator.clipboard.writeText(origin)}>copy</button>
+            </div>
+          </li>
+          <li>Download <a className="text-[var(--color-accent)] underline" href="/empire_bridge.mq5" download>empire_bridge.mq5</a> → copy into <code>MQL5/Experts</code> → MetaEditor me kholo → <b>F7 compile</b>.</li>
+          <li>Chart pe EA drag karo. Inputs: <code>IngestUrl</code> =
+            <code className="px-1 rounded bg-black/40 text-[var(--color-accent)] break-all">{ingestUrl}</code>
+            {" "}<button className="text-[var(--color-accent)] underline" onClick={() => navigator.clipboard.writeText(ingestUrl)}>copy</button>
+            aur <code>IngestToken</code> = account-register karte waqt mila <code>mt5_…</code> token.</li>
+          <li>Algo Trading ON → within a minute ye page <b>“synced (live)”</b> ho jayega — ingest sirf us token ke account-number se match hone pe hi accept hota hai, isliye “live terminal” proof hai, koi simulation nahi.</li>
+        </ol>
+      )}
+    </div>
+  );
+}
+
 export default function Mt5App({ appUrl }: { appUrl: string }) {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [journals, setJournals] = useState<Journal[]>([]);
@@ -106,6 +137,8 @@ export default function Mt5App({ appUrl }: { appUrl: string }) {
         <p><b className="text-white">How it works:</b> Your MT5 login/password never leaves your PC. A tiny EA (<a className="text-[var(--color-accent)] underline" href="/empire_bridge.mq5" download>empire_bridge.mq5</a>) running in your terminal reads account data and pushes it here with a scoped per-account token.</p>
         <p><b className="text-white">Honest status:</b> until an EA actually connects, every account shows “waiting for first sync” — nothing here is simulated.</p>
       </div>
+
+      <ConnectGuide ingestUrl={ingestUrl} appUrl={appUrl} />
 
       {msg && <div className="card p-3 text-sm text-[var(--color-profit)]">{msg}</div>}
       {err && <div className="card p-3 text-sm text-[var(--color-loss)]">{err}</div>}

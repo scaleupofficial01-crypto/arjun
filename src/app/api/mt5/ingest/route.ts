@@ -21,7 +21,7 @@ export async function POST(req: Request) {
   if (!db) return json({ error: "Database not configured", code: "setup-required" }, { status: 503 });
   const account = await db.mt5Account.findUnique({
     where: { ingestTokenHash: hashIngestToken(token) },
-    select: { id: true },
+    select: { id: true, login: true },
   });
   if (!account) return json({ error: "Invalid token" }, { status: 401 });
 
@@ -30,6 +30,16 @@ export async function POST(req: Request) {
     payload = parseIngestPayload(await req.json());
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : "Invalid payload" }, { status: 400 });
+  }
+
+  // Terminal identity check: if the EA reports its account login it MUST
+  // match the registered one — this is what makes "live terminal connected"
+  // provable instead of "someone posted numbers".
+  if (payload.account.login && payload.account.login !== account.login) {
+    return json(
+      { error: "login-mismatch", message: `EA reports login ${payload.account.login} but this token belongs to account ${account.login}` },
+      { status: 409 },
+    );
   }
 
   const accountUpdate: Record<string, unknown> = { lastSyncAt: new Date() };

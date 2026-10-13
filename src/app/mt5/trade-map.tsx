@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   createChart,
   LineSeries,
+  CandlestickSeries,
   createSeriesMarkers,
   ColorType,
   type IChartApi,
@@ -20,11 +21,36 @@ import { buildTradeMap, type MapDeal, type SymbolMap } from "@/lib/trade-map";
 export default function TradeMap({ deals }: { deals: MapDeal[] }) {
   const maps = useMemo(() => buildTradeMap(deals), [deals]);
   const [symbol, setSymbol] = useState<string | null>(null);
+  const [candles, setCandles] = useState<{ time: number; open: number; high: number; low: number; close: number }[]>([]);
+  const [candleSrc, setCandleSrc] = useState<{ label: string | null; proxyNote: string | null }>({ label: null, proxyNote: null });
   const hostRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
 
   const current: SymbolMap | null =
     maps.find((m) => m.symbol === (symbol ?? maps[0]?.symbol)) ?? maps[0] ?? null;
+
+  /** Real market candles behind the trades (when a free real feed exists). */
+  useEffect(() => {
+    if (!current) return;
+    let cancelled = false;
+    setCandles([]);
+    setCandleSrc({ label: null, proxyNote: null });
+    fetch(`/api/mt5/candles?symbol=${encodeURIComponent(current.symbol)}`)
+      .then(async (r) => {
+        if (!r.ok) return null;
+        const d = (await r.json()) as { candles?: { time: number; open: number; high: number; low: number; close: number }[]; source?: string; proxyNote?: string | null };
+        return d.candles ? d : null;
+      })
+      .then((d) => {
+        if (cancelled || !d || !d.candles) return;
+        setCandles(d.candles);
+        setCandleSrc({ label: d.source ?? null, proxyNote: d.proxyNote ?? null });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [current?.symbol]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const host = hostRef.current;
@@ -47,8 +73,25 @@ export default function TradeMap({ deals }: { deals: MapDeal[] }) {
     });
     chartRef.current = chart;
 
-    // Price trace across all synced deal points (grey, thin — context)
-    const trace = chart.addSeries(LineSeries, { color: "#475569", lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false });
+    // Real market candles as the backdrop (when available)
+    if (candles.length > 0) {
+      const cs = chart.addSeries(CandlestickSeries, {
+        upColor: "#164e2e",
+        downColor: "#5c1f1f",
+        wickUpColor: "#1f7a44",
+        wickDownColor: "#8a2a2a",
+        borderVisible: false,
+        priceLineVisible: false,
+      });
+      cs.setData(
+        candles.map((c) => ({
+          time: c.time as UTCTimestamp, open: c.open, high: c.high, low: c.low, close: c.close,
+        })),
+      );
+    }
+
+    // Price trace across all synced deal points (grey, thin — exact deal times)
+    const trace = chart.addSeries(LineSeries, { color: "#94a3b8", lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false });
     const seen = new Set<number>();
     trace.setData(
       current.points
@@ -89,7 +132,7 @@ export default function TradeMap({ deals }: { deals: MapDeal[] }) {
       chart.remove();
       chartRef.current = null;
     };
-  }, [current]);
+  }, [current, candles]);
 
   if (maps.length === 0) {
     return (
@@ -124,7 +167,9 @@ export default function TradeMap({ deals }: { deals: MapDeal[] }) {
       <div ref={hostRef} className="rounded-lg overflow-hidden border border-[var(--color-border)]" />
       <p className="text-[11px] text-[var(--color-muted)]">
         ▲ entry · ▼ exit · connector green = profitable round-trip, red = losing (from synced deal profit).
-        Price path is drawn from your own deal prices — external market candles for {current?.symbol ?? "this symbol"} need a paid feed on the free tier; nothing here is faked.
+        {candleSrc.label
+          ? <> Candles: {candleSrc.label}{candleSrc.proxyNote ? ` (${candleSrc.proxyNote})` : ""}; markers sit on your own synced deal prices.</>
+          : <> Price path is drawn from your own deal prices — external market candles for {current?.symbol ?? "this symbol"} need a paid feed on the free tier; nothing here is faked.</>}
       </p>
     </div>
   );

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import TradeMap from "./trade-map";
+import { buildRoundTrips } from "@/lib/trade-map";
 
 interface Account {
   id: string; label: string; login: string; server: string; currency: string;
@@ -9,7 +10,7 @@ interface Account {
   positions?: number; deals?: number;
 }
 interface Position { ticket: string; symbol: string; side: string; volume: string; openPrice: string; openAt: string; profit: string | null; }
-interface Deal { ticket: string; positionId: string; symbol: string; side: string; entry: string; volume: string; price: string; profit: string; dealtAt: string; imported: boolean; }
+interface Deal { ticket: string; positionId: string; symbol: string; side: string; entry: string; volume: string; price: string; profit: string; commission: string; swap: string; dealtAt: string; imported: boolean; }
 interface Journal { id: string; name: string; }
 
 async function call<T>(url: string, init?: RequestInit): Promise<{ ok: boolean; data: T | null; error?: string }> {
@@ -234,25 +235,75 @@ export default function Mt5App({ appUrl }: { appUrl: string }) {
               </tbody>
             </table>
           </div>
-          <h3 className="text-sm font-medium text-[var(--color-accent)]">Recent deals (last {detail.deals.length})</h3>
+          <h3 className="text-sm font-medium text-[var(--color-accent)]">Chart — your trades on real market candles</h3>
           <TradeMap deals={detail.deals.map((d) => ({ ...d, dealtAt: String(d.dealtAt) }))} />
-          <div className="overflow-x-auto max-h-72 overflow-y-auto">
-            <table className="w-full text-xs">
-              <thead className="text-[var(--color-muted)] text-left"><tr><th className="py-1">Ticket</th><th>Symbol</th><th>Entry</th><th>Side</th><th>Vol</th><th>Price</th><th>Profit</th><th>Time (UTC)</th><th></th></tr></thead>
-              <tbody>
-                {detail.deals.map((d) => (
-                  <tr key={d.ticket} className="border-t border-[var(--color-border)]">
-                    <td className="py-1">#{d.ticket}</td><td>{d.symbol}</td><td>{d.entry}</td><td>{d.side}</td>
-                    <td>{d.volume}</td><td>{d.price}</td>
-                    <td className={Number(d.profit) >= 0 ? "text-[var(--color-profit)]" : "text-[var(--color-loss)]"}>{d.profit}</td>
-                    <td>{new Date(d.dealtAt).toLocaleString()}</td>
-                    <td>{d.imported && <span className="badge badge-live">in journal</span>}</td>
-                  </tr>
-                ))}
-                {detail.deals.length === 0 && <tr><td colSpan={9} className="py-2 text-[var(--color-muted)]">No deals synced yet.</td></tr>}
-              </tbody>
-            </table>
-          </div>
+
+          {(() => {
+            const deals = detail.deals.map((d) => ({ ...d, dealtAt: String(d.dealtAt) }));
+            const trips = buildRoundTrips(deals);
+            const fmtT = (s: string) => {
+              const d = new Date(s);
+              const p = (n: number) => String(n).padStart(2, "0");
+              return `${d.getUTCFullYear()}.${p(d.getUTCMonth() + 1)}.${p(d.getUTCDate())} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}`;
+            };
+            const money = (n: number) => (n > 0 ? `+${n.toFixed(2)}` : n.toFixed(2));
+            return (
+              <>
+                <h3 className="text-sm font-medium text-[var(--color-accent)]">History — closed trades ({trips.length})</h3>
+                <p className="text-[10px] text-[var(--color-muted)]">MT5 History-tab style: one clean row per round-trip. Commission, swap and profit are as reported by your terminal. SL/TP columns nehi dikha rahe — woh data EA se aata hi nehi.</p>
+                <div className="overflow-x-auto max-h-72 overflow-y-auto">
+                  <table className="w-full text-xs">
+                    <thead className="text-[var(--color-muted)] text-left">
+                      <tr>
+                        <th className="py-1 px-2 whitespace-nowrap">Open time</th><th>Position</th><th>Symbol</th><th>Type</th><th className="py-1 px-2 text-right whitespace-nowrap">Vol</th>
+                        <th className="py-1 px-2 text-right whitespace-nowrap">Open price</th><th>Close time</th><th className="py-1 px-2 text-right whitespace-nowrap">Close price</th>
+                        <th className="py-1 px-2 text-right whitespace-nowrap">Comm</th><th className="py-1 px-2 text-right whitespace-nowrap">Swap</th><th className="py-1 px-2 text-right whitespace-nowrap">Profit</th><th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {trips.map((t, i) => (
+                        <tr key={t.positionId} className={`border-t border-[var(--color-border)] ${i % 2 ? "bg-white/[0.02]" : ""}`}>
+                          <td className="py-1 px-2 whitespace-nowrap">{fmtT(t.openTime)}</td>
+                          <td className="px-2 text-[var(--color-muted)]">#{t.positionId}</td>
+                          <td className="px-2">{t.symbol}</td>
+                          <td className={t.side === "BUY" ? "px-2 text-[var(--color-profit)]" : "px-2 text-[var(--color-loss)]"}>{t.side}</td>
+                          <td className="py-1 px-2 text-right">{(Math.round(t.volume * 100) / 100).toString()}</td>
+                          <td className="py-1 px-2 text-right">{t.openPrice}</td>
+                          <td className="py-1 px-2 whitespace-nowrap">{fmtT(t.closeTime)}</td>
+                          <td className="py-1 px-2 text-right">{t.closePrice}</td>
+                          <td className="text-right px-2 text-[var(--color-muted)]">{t.commission === 0 ? "0.00" : t.commission.toFixed(2)}</td>
+                          <td className="text-right px-2 text-[var(--color-muted)]">{t.swap === 0 ? "0.00" : t.swap.toFixed(2)}</td>
+                          <td className={`text-right px-2 font-medium ${t.win ? "text-[var(--color-profit)]" : "text-[var(--color-loss)]"}`}>{money(t.profit)}</td>
+                          <td className="px-2">{t.inJournal && <span className="badge badge-live">in journal</span>}</td>
+                        </tr>
+                      ))}
+                      {trips.length === 0 && <tr><td colSpan={12} className="py-2 text-[var(--color-muted)]">No closed trades yet — jab trade close hoga, terminal sync ke baad yahan history banegi.</td></tr>}
+                    </tbody>
+                  </table>
+                </div>
+                <details className="text-xs">
+                  <summary className="cursor-pointer text-[var(--color-muted)]">Raw deals ({deals.length}) — technical/audit view</summary>
+                  <div className="overflow-x-auto max-h-60 overflow-y-auto mt-2">
+                    <table className="w-full text-xs">
+                      <thead className="text-[var(--color-muted)] text-left"><tr><th className="py-1">Ticket</th><th>Symbol</th><th>Entry</th><th>Side</th><th>Vol</th><th>Price</th><th>Profit</th><th>Time (UTC)</th><th></th></tr></thead>
+                      <tbody>
+                        {deals.map((d) => (
+                          <tr key={d.ticket} className="border-t border-[var(--color-border)]">
+                            <td className="py-1">#{d.ticket}</td><td>{d.symbol}</td><td>{d.entry}</td><td>{d.side}</td>
+                            <td>{d.volume}</td><td>{d.price}</td>
+                            <td className={Number(d.profit) >= 0 ? "text-[var(--color-profit)]" : "text-[var(--color-loss)]"}>{d.profit}</td>
+                            <td>{fmtT(d.dealtAt)}</td>
+                            <td>{d.imported && <span className="badge badge-live">in journal</span>}</td>
+                          </tr>
+                        ))}
+                        {deals.length === 0 && <tr><td colSpan={9} className="py-2 text-[var(--color-muted)]">No deals synced yet.</td></tr>}
+                      </tbody>
+                    </table>
+                  </div>
+                </details>
+              </>
+            );
+          })()}
         </div>
       )}
     </div>

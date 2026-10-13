@@ -76,8 +76,8 @@ export default function TradeMap({ deals }: { deals: MapDeal[] }) {
     // Real market candles as the backdrop (when available)
     if (candles.length > 0) {
       const cs = chart.addSeries(CandlestickSeries, {
-        upColor: "#164e2e",
-        downColor: "#5c1f1f",
+        upColor: "#089981",
+        downColor: "#f23645",
         wickUpColor: "#1f7a44",
         wickDownColor: "#8a2a2a",
         borderVisible: false,
@@ -99,16 +99,35 @@ export default function TradeMap({ deals }: { deals: MapDeal[] }) {
         .map((p) => ({ time: p.time as UTCTimestamp, value: p.value })),
     );
 
-    // One green/red connector per closed round-trip
+    // TradingView-position style: dashed entry/exit level lines + solid win/loss connector
     for (const seg of current.segments) {
-      const s = chart.addSeries(LineSeries, {
+      const mk = (value: number, color: string, width: 1 | 2, dashed: boolean) => {
+        const s = chart.addSeries(LineSeries, {
+          color,
+          lineWidth: width,
+          lineStyle: dashed ? 2 : 0,
+          priceLineVisible: false,
+          lastValueVisible: false,
+          crosshairMarkerVisible: false,
+        });
+        s.setData([
+          { time: seg.from.time as UTCTimestamp, value },
+          { time: seg.to.time as UTCTimestamp, value },
+        ]);
+      };
+      // dashed level at entry price and at exit price (TV's position overlay)
+      mk(seg.from.value, "rgba(100,116,139,0.8)", 1, true);
+      mk(seg.to.value, "rgba(100,116,139,0.8)", 1, true);
+      // solid connector, green = win / red = loss
+      const conn = chart.addSeries(LineSeries, {
         color: seg.win === null ? "#64748b" : seg.win ? "#22c55e" : "#ef4444",
         lineWidth: 2,
         priceLineVisible: false,
         lastValueVisible: false,
         title: `#${seg.positionId}`,
+        crosshairMarkerVisible: false,
       });
-      s.setData([
+      conn.setData([
         { time: seg.from.time as UTCTimestamp, value: seg.from.value },
         { time: seg.to.time as UTCTimestamp, value: seg.to.value },
       ]);

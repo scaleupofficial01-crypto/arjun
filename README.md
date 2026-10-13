@@ -94,6 +94,20 @@ unconfigured), CSRF/origin checks, rate limits on auth routes.
   with `Authorization: Bearer <CRON_SECRET>`. Preview uses
   `scripts/alert-poller.sh`. "Check now" button also runs a real check on demand.
 
+### Phase 3 works today
+- **MT5 Sync** (`/mt5`): read-only bridge with an honest security model —
+  **no MT5 password (master OR investor) ever touches this server**. Register
+  an account (login number + server only) → get a scoped per-account ingest
+  token (shown once, sha256-stored, rotatable) → the terminal-side EA
+  [`public/empire_bridge.mq5`](public/empire_bridge.mq5) pushes balance/equity,
+  open positions and closed deals to `POST /api/mt5/ingest` every N seconds.
+  Deals upsert by ticket (idempotent), positions are an authoritative
+  snapshot, and **Import to journal** converts IN/OUT deal pairs into real
+  closed trades with pnl recomputed server-side (terminal-reported profit is
+  never trusted). Until an EA connects, accounts honestly show
+  "waiting for first sync".
+  Protocol E2E-verified: `22.5×0.1 − 1.75 = 0.5` exactly.
+
 ### No-auth mode (default — owner directive)
 The app does **not** require or display a login step: `/`, `/login`,
 `/register`, `/forgot-password`, `/reset-password`, `/verify-email` all

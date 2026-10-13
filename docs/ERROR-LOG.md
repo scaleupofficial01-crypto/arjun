@@ -46,3 +46,19 @@ Running log of defects found/fixed. Read this before touching related code
 - Sandbox quirks (not app bugs): node_modules + .next purged between sessions;
   scripts/preview.sh self-heals; git needs identity re-set per session;
   credentials/.env sourcing needs quoted values for '&' in URLs.
+
+## Phase 3 (MT5 sync) — design decisions (2026-10-13)
+- **Ingest token = credential**: EA authenticates with a per-account Bearer
+  token; server stores only sha256. No session/CSRF on /api/mt5/ingest
+  (EA is not a browser). Rotate endpoint revokes instantly.
+- **No MT5 passwords server-side — including investor**: terminal holds ALL
+  credentials; EA pushes only public-metadata + trade data. (Spec §3.)
+- **Deals authoritative by ticket** (unique per account): re-sends upsert,
+  import skips groups already imported (importedTradeId marker).
+- **pnl never trusted from terminal**: import recomputes via computePnl from
+  stored prices/qty/fees (verified: 22.5*0.1 − 1.75 = 0.5 exactly).
+- **Positions snapshot is authoritative**: tickets absent from a push are
+  treated as closed and deleted server-side — EA must always send the full
+  open set (documented in EA header).
+- Sandbox note: apt packages + orphan processes still wiped between
+  sessions; scripts/db-bootstrap.sh + preview.sh self-heal fully.

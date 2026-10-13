@@ -10,6 +10,7 @@ const links = [
   ["/calendar", "Calendar"],
   ["/analytics", "Analytics"],
   ["/watchlists", "Watchlists"],
+  ["/mt5", "MT5"],
 ] as const;
 
 export default async function AppNav({ active }: { active: string }) {

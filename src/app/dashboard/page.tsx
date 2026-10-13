@@ -26,7 +26,7 @@ const modules = [
   { name: "Calendar", href: "/calendar", phase: null, ready: true, desc: "Daily & monthly P&L heatmap — click any day to see its trades." },
   { name: "Analytics", href: "/analytics", phase: null, ready: true, desc: "Win rate, expectancy, profit factor, max drawdown vs true peak, equity curve." },
   { name: "Watchlists & Alerts", href: "/watchlists", phase: null, ready: true, desc: "Real prices only (Coinbase live / ECB forex). Alerts fire on real crosses." },
-  { name: "MT5 Sync", href: null, phase: "Phase 3", ready: false, desc: "Two-way MT5 trade sync via read-only bridge — no master password ever." },
+  { name: "MT5 Sync", href: "/mt5", phase: null, ready: true, desc: "Read-only EA bridge — terminal pushes deals/positions with a scoped token. No passwords stored, ever." },
   { name: "Messenger", href: null, phase: "Phase 4", ready: false, desc: "Pro DM chat: groups, reactions, read receipts, chart sharing." },
   { name: "Empire Meet", href: null, phase: "Phase 5", ready: false, desc: "In-app video meetings with screen share. No external links." },
   { name: "Community", href: null, phase: "Phase 6", ready: false, desc: "Trader profiles, follows, analysis posts with server-side visibility rules." },

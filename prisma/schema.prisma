@@ -33,6 +33,7 @@ model User {
   priceAlerts        PriceAlert[]
   notifications      Notification[]
   chartLayouts       ChartLayout[]
+  mt5Accounts    Mt5Account[]
 
   @@map("users")
 }
@@ -257,4 +258,67 @@ model Notification {
 
   @@index([userId, createdAt])
   @@map("notifications")
+}
+
+// ─── Phase 3: MT5 Sync (read-only bridge, no passwords stored server-side) ───
+
+model Mt5Account {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label           String
+  login           String // MT5 account number — public metadata, NOT a secret
+  server          String
+  currency        String   @default("USD")
+  // Raw ingest token is shown ONCE at creation; we store only its sha256.
+  ingestTokenHash String   @unique
+  balance         Decimal? @db.Decimal(20, 2)
+  equity          Decimal? @db.Decimal(20, 2)
+  lastSyncAt      DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  positions       Mt5Position[]
+  deals           Mt5Deal[]
+
+  @@index([userId])
+  @@map("mt5_accounts")
+}
+
+model Mt5Position {
+  id        String     @id @default(cuid())
+  accountId String
+  account   Mt5Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  ticket    String
+  symbol    String
+  side      TradeSide
+  volume    Decimal    @db.Decimal(20, 8)
+  openPrice Decimal    @db.Decimal(20, 8)
+  openAt    DateTime
+  profit    Decimal?   @db.Decimal(20, 8) // floating P&L as reported by the terminal
+  updatedAt DateTime   @updatedAt
+
+  @@unique([accountId, ticket])
+  @@map("mt5_positions")
+}
+
+model Mt5Deal {
+  id              String     @id @default(cuid())
+  accountId       String
+  account         Mt5Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  ticket          String
+  positionId      String // links IN+OUT deals of one round trip
+  symbol          String
+  side            TradeSide
+  entry           String     @default("IN") // IN | OUT | INOUT
+  volume          Decimal    @db.Decimal(20, 8)
+  price           Decimal    @db.Decimal(20, 8)
+  profit          Decimal    @db.Decimal(20, 8)
+  commission      Decimal    @default(0) @db.Decimal(20, 8)
+  swap            Decimal    @default(0) @db.Decimal(20, 8)
+  dealtAt         DateTime
+  importedTradeId String?
+
+  @@unique([accountId, ticket])
+  @@index([accountId, dealtAt])
+  @@map("mt5_deals")
 }

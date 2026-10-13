@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import TradeMap from "./trade-map";
 
 interface Account {
   id: string; label: string; login: string; server: string; currency: string;
@@ -33,7 +34,13 @@ export default function Mt5App({ appUrl }: { appUrl: string }) {
 
   const load = useCallback(async () => {
     const r = await call<{ accounts: Account[] }>("/api/mt5/accounts");
-    if (r.ok && r.data) setAccounts(r.data.accounts);
+    if (r.ok && r.data) {
+      setAccounts(r.data.accounts);
+      // UX: auto-open the most recently synced account's details so users
+      // land straight on live positions/deals + trade map.
+      const synced = r.data.accounts.find((a) => a.lastSyncAt);
+      if (synced) void openDetail(synced.id);
+    }
     const j = await call<{ journals: Journal[] }>("/api/journals");
     if (j.ok && j.data) setJournals(j.data.journals);
   }, []);
@@ -195,6 +202,7 @@ export default function Mt5App({ appUrl }: { appUrl: string }) {
             </table>
           </div>
           <h3 className="text-sm font-medium text-[var(--color-accent)]">Recent deals (last {detail.deals.length})</h3>
+          <TradeMap deals={detail.deals.map((d) => ({ ...d, dealtAt: String(d.dealtAt) }))} />
           <div className="overflow-x-auto max-h-72 overflow-y-auto">
             <table className="w-full text-xs">
               <thead className="text-[var(--color-muted)] text-left"><tr><th className="py-1">Ticket</th><th>Symbol</th><th>Entry</th><th>Side</th><th>Vol</th><th>Price</th><th>Profit</th><th>Time (UTC)</th><th></th></tr></thead>

@@ -21,16 +21,16 @@ function Pill({ ok, label }: { ok: boolean; label: string }) {
 }
 
 const modules = [
-  { name: "Trading Journal", href: "/journal", phase: null, ready: true },
-  { name: "Live Charts", href: "/charts", phase: null, ready: true },
-  { name: "Calendar", href: "/calendar", phase: null, ready: true },
-  { name: "Analytics", href: "/analytics", phase: null, ready: true },
-  { name: "Watchlists & Alerts", href: "/watchlists", phase: null, ready: true },
-  { name: "MT5 Sync", href: null, phase: "Phase 3", ready: false },
-  { name: "Messenger", href: null, phase: "Phase 4", ready: false },
-  { name: "Empire Meet", href: null, phase: "Phase 5", ready: false },
-  { name: "Community", href: null, phase: "Phase 6", ready: false },
-  { name: "Admin", href: null, phase: "Phase 6", ready: false },
+  { name: "Trading Journal", href: "/journal", phase: null, ready: true, desc: "Trades, groups, screenshots, CSV/Excel import-export. P&L always server-computed." },
+  { name: "Live Charts", href: "/charts", phase: null, ready: true, desc: "TradingView advanced chart. Your drawings persist per symbol across devices." },
+  { name: "Calendar", href: "/calendar", phase: null, ready: true, desc: "Daily & monthly P&L heatmap — click any day to see its trades." },
+  { name: "Analytics", href: "/analytics", phase: null, ready: true, desc: "Win rate, expectancy, profit factor, max drawdown vs true peak, equity curve." },
+  { name: "Watchlists & Alerts", href: "/watchlists", phase: null, ready: true, desc: "Real prices only (Coinbase live / ECB forex). Alerts fire on real crosses." },
+  { name: "MT5 Sync", href: null, phase: "Phase 3", ready: false, desc: "Two-way MT5 trade sync via read-only bridge — no master password ever." },
+  { name: "Messenger", href: null, phase: "Phase 4", ready: false, desc: "Pro DM chat: groups, reactions, read receipts, chart sharing." },
+  { name: "Empire Meet", href: null, phase: "Phase 5", ready: false, desc: "In-app video meetings with screen share. No external links." },
+  { name: "Community", href: null, phase: "Phase 6", ready: false, desc: "Trader profiles, follows, analysis posts with server-side visibility rules." },
+  { name: "Admin", href: null, phase: "Phase 6", ready: false, desc: "Moderation, feature flags, integration health — server-side role gates." },
 ];
 
 export default async function DashboardPage() {
@@ -45,9 +45,10 @@ export default async function DashboardPage() {
     <main className="min-h-screen max-w-6xl mx-auto px-6 py-8 space-y-8">
       {isDemo && (
         <div className="card p-4 border-amber-500/40 bg-amber-500/5 text-sm">
-          <span className="badge badge-demo mr-2">Demo preview</span>
-          Login is bypassed in this preview build (DEMO_MODE). Production keeps
-          full auth. <Link className="underline text-[var(--color-accent)]" href="/">Back to landing</Link>
+          <span className="badge badge-demo mr-2">Shared workspace</span>
+          No login needed — you are working in a shared demo workspace. Every
+          feature below is fully functional; data here is demo data anyone with
+          the link can see.
         </div>
       )}
       <header className="flex items-center justify-between">
@@ -96,13 +97,18 @@ export default async function DashboardPage() {
       <section className="grid md:grid-cols-3 sm:grid-cols-2 gap-4">
         {modules.map((m) =>
           m.ready && m.href ? (
-            <Link key={m.name} href={m.href} className="card p-5 hover:border-[var(--color-accent)] transition">
-              <h3 className="font-semibold">{m.name}</h3>
+            <Link key={m.name} href={m.href} className="card p-5 hover:border-[var(--color-accent)] hover:-translate-y-0.5 transition group">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold group-hover:text-[var(--color-accent)] transition">{m.name}</h3>
+                <span className="text-[var(--color-muted)] group-hover:text-[var(--color-accent)] group-hover:translate-x-0.5 transition">→</span>
+              </div>
+              <p className="text-xs text-[var(--color-muted)] mt-2 leading-relaxed">{m.desc}</p>
               <span className="badge badge-live mt-3">Live — open</span>
             </Link>
           ) : (
-            <div key={m.name} className="card p-5 opacity-90">
+            <div key={m.name} className="card p-5 opacity-70">
               <h3 className="font-semibold">{m.name}</h3>
+              <p className="text-xs text-[var(--color-muted)] mt-2 leading-relaxed">{m.desc}</p>
               <span className="badge badge-setup mt-3">{m.phase} — coming soon</span>
             </div>
           ),

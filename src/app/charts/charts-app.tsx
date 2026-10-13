@@ -77,16 +77,22 @@ export default function ChartsApp({ initialSymbol }: { initialSymbol: string }) 
       host.innerHTML = "";
       const container = document.createElement("div");
       container.className = "tradingview-widget-container";
-      container.style.height = "640px";
+      container.style.height = "100%";
+      container.style.width = "100%";
       const inner = document.createElement("div");
       inner.className = "tradingview-widget-container__widget";
       inner.style.height = "100%";
+      inner.style.width = "100%";
       container.appendChild(inner);
       const script = document.createElement("script");
       // Bug #4 rule: embed-widget-advanced-chart.js, NOT legacy tv.js
       script.src = "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
       script.async = true;
       script.innerHTML = JSON.stringify({
+        // autosize: iframe fills 100% of the widget div (fixes dead space bug)
+        autosize: true,
+        height: "100%",
+        width: "100%",
         symbol: tvSym,
         interval: statusInterval(),
         timezone: "Etc/UTC",
@@ -188,7 +194,10 @@ export default function ChartsApp({ initialSymbol }: { initialSymbol: string }) 
       </div>
       <p className="text-xs text-[var(--color-muted)]">{dataNote}</p>
       <div className="card p-1">
-        <div ref={containerRef} style={{ minHeight: 640 }} />
+        <div
+          ref={containerRef}
+          style={{ height: "calc(100vh - 320px)", minHeight: 560 }}
+        />
       </div>
       <p className="text-xs text-[var(--color-muted)]">
         Draw trendlines/lines inside the chart with the left toolbar (💾 autosaves every 20s and

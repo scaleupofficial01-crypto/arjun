@@ -1,3 +1,6 @@
+import { redirect } from "next/navigation";
+import { DEMO_MODE } from "@/lib/demo";
+
 export const metadata = { title: "Create account — Empire" };
 
 const ERROR_TEXT: Record<string, string> = {
@@ -15,6 +18,8 @@ export default async function RegisterPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   const params = await searchParams;
+  // No-auth mode: never render a sign-up step.
+  if (DEMO_MODE) redirect("/dashboard");
   return (
     <div className="space-y-6">
       <h1 className="text-xl font-semibold text-center">Create your account</h1>

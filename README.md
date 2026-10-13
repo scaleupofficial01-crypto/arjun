@@ -94,7 +94,13 @@ unconfigured), CSRF/origin checks, rate limits on auth routes.
   with `Authorization: Bearer <CRON_SECRET>`. Preview uses
   `scripts/alert-poller.sh`. "Check now" button also runs a real check on demand.
 
-### Demo mode (preview only)
-`DEMO_MODE=true` in `/credentials/.env` (never in production): protected pages
-render with a demo identity instead of redirecting to login, clearly labeled.
+### No-auth mode (default — owner directive)
+The app does **not** require or display a login step: `/`, `/login`,
+`/register`, `/forgot-password`, `/reset-password`, `/verify-email` all
+redirect straight to `/dashboard`, and every visitor works under one shared
+identity (`demo-preview-user`, badge-labeled "Demo" in the nav).
+Set `AUTH_REQUIRED=true` (see `credentials/.env.template`) to switch sessions,
+sign-in, sign-up and email verification back on — the full auth stack still
+exists and is exercised by the test suite (`NODE_ENV=test` always enforces
+auth regardless of this flag).
 

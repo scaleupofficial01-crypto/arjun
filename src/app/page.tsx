@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { DEMO_MODE } from "@/lib/demo";
 
 const features = [
   ["Trading Journal", "Full trade CRUD, risk, P&L, screenshots, CSV/Excel import-export. All math from your real records."],
@@ -13,6 +15,9 @@ const features = [
 ] as const;
 
 export default function Home() {
+  // No-auth mode (default): skip the marketing/login gate entirely and take
+  // visitors straight into the app. AUTH_REQUIRED=true restores this page.
+  if (DEMO_MODE) redirect("/dashboard");
   return (
     <main className="min-h-screen">
       <nav className="flex items-center justify-between px-6 py-4 border-b border-[var(--color-border)]">

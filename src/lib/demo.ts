@@ -2,11 +2,22 @@ import "server-only";
 import type { User } from "@prisma/client";
 
 /**
- * DEMO MODE — local preview only. When DEMO_MODE=true, protected pages render
- * with a demo identity instead of redirecting to /login. The UI must label
- * this state (honesty rules) and production must NEVER set DEMO_MODE.
+ * NO-AUTH MODE (default). Per the owner's directive, the app does not require
+ * or display a login step: every visitor lands directly on the internal app
+ * content under a shared demo identity. Auth (sessions, /login, /register)
+ * is only enforced when AUTH_REQUIRED=true is explicitly set, or in tests
+ * (NODE_ENV=test / vitest) so the real auth code paths stay covered.
+ *
+ * Consequences to remember before enabling for a real audience:
+ *  - everyone with the URL shares ONE workspace ("demo-preview-user")
+ *  - ownership checks still apply between real users when auth is on
  */
-export const DEMO_MODE = process.env.DEMO_MODE === "true";
+const AUTH_REQUIRED =
+  process.env.AUTH_REQUIRED === "true" ||
+  ((process.env.NODE_ENV === "test" || process.env.VITEST === "true") &&
+    process.env.DEMO_MODE !== "true");
+
+export const DEMO_MODE = !AUTH_REQUIRED;
 
 export const DEMO_USER: User = {
   id: "demo-preview-user",

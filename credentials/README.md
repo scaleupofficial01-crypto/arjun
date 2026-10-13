@@ -30,6 +30,10 @@ commit. When a new key is added: real value → `.env`, empty key name →
 
 | `GITHUB_TOKEN` | Pushing commits to the GitHub repo (§2) | git remote auth, local only — never committed (lives in .git/config, snapshot-excluded) |
 
+| `SUPABASE_DB_PASSWORD` | Supabase production Postgres password (§0) | injected into DATABASE_URL/DIRECT_URL at runtime — URLs built with URL-encoding, value never logged |
+
+| `AUTH_REQUIRED` | Set `true` to enable sessions + /login + /register (§ auth). Default EMPTY = no-auth mode: everyone lands directly in the app under the shared demo identity | src/lib/demo.ts — server + edge runtime gate |
+
 ## Notes
 - TradingView: free **Advanced Chart embed widget** (`embed-widget-advanced-chart.js`,
   not legacy `tv.js`) — no API key needed (bug #4).

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import SavedChart from "./saved-chart";
 
 /** Map a user-typed symbol to a TradingView symbol. */
 function tvSymbol(raw: string): string {
@@ -21,7 +20,6 @@ export default function ChartsApp({ initialSymbol }: { initialSymbol: string }) 
   const [symbol, setSymbol] = useState(initialSymbol);
   const tvSym = tvSymbol(symbol);
 
-  // React 18 StrictMode (dev) double-mounts: remount the widget per effect pass (bug #4 guard).
   return (
     <div className="max-w-6xl mx-auto px-6 py-8 space-y-4">
       <div className="flex flex-wrap items-center gap-3">
@@ -37,24 +35,31 @@ export default function ChartsApp({ initialSymbol }: { initialSymbol: string }) 
           <input name="symbol" defaultValue={symbol} key={symbol} className="input !py-1.5 w-40" placeholder="Symbol" />
           <button className="btn-primary !py-1.5 text-sm">Load</button>
         </form>
-        <span className="badge badge-live">account-synced drawings + TradingView pro chart</span>
+        <span className="badge badge-live">TradingView advanced chart</span>
       </div>
 
-      {/* Panel 1 — drawings that truly sync to the account (server-side). */}
-      <SavedChart key={`saved-${symbol}`} symbol={symbol} />
+      <div className="text-xs text-[var(--color-muted)] card p-3 space-y-1">
+        <p>
+          <span className="text-[var(--color-profit)] font-medium">✓ Saving (built-in):</span>{" "}
+          jo bhi trendlines/tools aap yahan draw karte ho, TradingView unhe{" "}
+          <b>isi browser me automatically save</b> karta hai — reload ya baad me wapas aane
+          par wo waise-ki-waise milengi.
+        </p>
+        <p>
+          <span className="text-amber-400 font-medium">Note:</span> cross-device account sync
+          free widget me technically possible nahi (TradingView khud parent page ko drawing
+          data nahi deta; wo unki licensed Charting Library ka feature hai). Yahan kuch bhi
+          fake nahi hai.
+        </p>
+      </div>
 
-      {/* Panel 2 — the full TradingView toolbox. */}
+      {/* Official embed — bug #4 rule: embed-widget-advanced-chart.js inside
+          .tradingview-widget-container. React double-mount guard via key. */}
       <TvEmbed key={`tv-${symbol}`} tvSym={tvSym} />
     </div>
   );
 }
 
-/**
- * Official TradingView advanced-chart embed (bug #4 rule:
- * embed-widget-advanced-chart.js inside .tradingview-widget-container).
- * Its drawings auto-save in THIS BROWSER (TradingView's own storage) —
- * account/device sync lives in the My Saved Chart panel above.
- */
 function TvEmbed({ tvSym }: { tvSym: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -99,17 +104,8 @@ function TvEmbed({ tvSym }: { tvSym: string }) {
   }, [tvSym]);
 
   return (
-    <div className="card p-4 space-y-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <h2 className="font-semibold">TradingView Pro Chart — {tvSym}</h2>
-        <span className="badge badge-demo">pro toolbox</span>
-        <span className="text-xs text-[var(--color-muted)]">
-          full indicator/fib toolbox · its drawings auto-save on this browser
-        </span>
-      </div>
-      <div className="card p-1">
-        <div ref={containerRef} style={{ height: "calc(100vh - 340px)", minHeight: 520 }} />
-      </div>
+    <div className="card p-1">
+      <div ref={containerRef} style={{ height: "calc(100vh - 300px)", minHeight: 560 }} />
     </div>
   );
 }

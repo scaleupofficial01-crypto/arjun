@@ -70,7 +70,7 @@ export default async function TraderProfilePage({ params }: { params: Promise<{ 
         <div className="space-y-3">
           {posts.length === 0 && (
             <div className="card p-5 text-sm text-[var(--color-muted)]">
-              {canSeeFollowersOnly ? "Is trader ne abhi post nahi kiya." : "Follow karo to jyada posts dikhenge — abhi sirf public posts yahan hain."}
+              {canSeeFollowersOnly ? "This trader has not posted yet." : "Follow to see more — only public posts are shown here."}
             </div>
           )}
           {posts.map((p) => (

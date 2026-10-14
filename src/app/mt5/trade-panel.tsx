@@ -130,7 +130,7 @@ export default function TradePanel({
   const place = useCallback(async (side: "BUY" | "SELL") => {
     const vol = Number(volume);
     if (!accountId || !symbol || !Number.isFinite(vol) || vol <= 0) {
-      setStatus({ kind: "err", text: "Symbol aur volume check karo." });
+      setStatus({ kind: "err", text: "Check the symbol and volume." });
       return;
     }
     setBusy(side);
@@ -147,7 +147,7 @@ export default function TradePanel({
         setStatus({ kind: "err", text: d.message ?? d.error ?? `HTTP ${r.status}` });
         return;
       }
-      setStatus({ kind: "info", text: `QUEUED — EA ke agle poll pe execute hogi… ${d.eaHint ?? ""}` });
+      setStatus({ kind: "info", text: `QUEUED — will execute on the EA's next poll… ${d.eaHint ?? ""}` });
       watchCommand(d.command.id);
     } catch {
       setBusy(null);
@@ -232,11 +232,11 @@ export default function TradePanel({
       {/* status strip — the honest state machine, always labeled */}
       <div className="flex flex-wrap items-center gap-2 text-[11px]">
         {!tradingOk ? (
-          <span className="badge badge-setup">trading locked — may pe v2 empire_bridge.mq5 replace karo (ek sync ke baad live)</span>
+          <span className="badge badge-setup">trading locked — replace empire_bridge.mq5 on MT5 with the v2 EA (live after one sync)</span>
         ) : eaLive ? (
           <span className="badge badge-live">EA live · synced {syncAgeS}s pehle</span>
         ) : (
-          <span className="badge badge-setup">{syncAgeS === null ? "EA kabhi sync nahi hua" : `EA offline — ${Math.round((syncAgeS ?? 0) / 60)}min pehle last sync`}</span>
+          <span className="badge badge-setup">{syncAgeS === null ? "EA has never synced" : `EA last sync ${syncAgeS}s ago — submit anyway, it will execute when back online`}</span>
         )}
         {quote && (
           <span className={quote.ageS <= 30 ? "text-[var(--color-muted)]" : "text-amber-400"}>
@@ -244,7 +244,7 @@ export default function TradePanel({
           </span>
         )}
         {!quote && tradingOk && (
-          <span className="text-[var(--color-muted)]">is symbol ka quote abhi nahi aaya — Market Watch me add karke rakho; click kar sakte ho, EA validate karega</span>
+          <span className="text-[var(--color-muted)]">no quote for this symbol yet — add it in Market Watch; you can still submit and the EA will validate</span>
         )}
       </div>
 

@@ -48,7 +48,7 @@ export async function POST(req: Request) {
       {
         error: "EA update required",
         code: "ea-v1",
-        message: "Yeh account abhi v1 (read-only) bridge se sync ho raha hai. Trading ke liye app se naya empire_bridge.mq5 (v2) download karke terminal me replace karo, phir ek sync ke baad SELL/BUY buttons live ho jayenge.",
+        message: "This account is syncing through the v1 (read-only) bridge. Download the new empire_bridge.mq5 (v2) from the app and replace it in your terminal — after one sync, the SELL/BUY buttons will go live.",
       },
       { status: 409 },
     );
@@ -66,9 +66,9 @@ export async function POST(req: Request) {
     },
     // Truthful hint: the fill can only arrive on the EA's next poll.
     eaHint: staleMs === null
-      ? "EA kabhi sync nahi hua — command QUEUED rahegi jab tak EA v2 connect na ho."
+      ? "The EA has never synced — the command stays QUEUED until the v2 EA connects."
       : staleMs > 120_000
-        ? `EA ${Math.round(staleMs / 60000)}min pehle last sync — offline lagta hai; wapas aane par command execute hogi.`
+        ? `EA last synced ${Math.round(staleMs / 60000)}min ago — looks offline; the command will execute when it returns.`
         : null,
   }, { status: 201 });
 }

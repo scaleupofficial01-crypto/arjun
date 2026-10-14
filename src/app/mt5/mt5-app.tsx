@@ -38,7 +38,7 @@ function ConnectGuide({ ingestUrl, appUrl }: { ingestUrl: string; appUrl: string
       </button>
       {open && (
         <ol className="text-xs text-[var(--color-muted)] list-decimal ml-5 space-y-1.5">
-          <li>MT5 open karo (demo ya real — dono chalenge). v1 bridge read-only tha; <b>v2 EA app ke SELL/BUY clicks ko sirf isi terminal ke andar market order</b> banata hai — password yaha bhi nahi aata, token rotate = sab revoke.</li>
+          <li>Open MT5 (demo or real — both work). The v1 bridge was read-only; <b>the v2 EA turns the app&#39;s SELL/BUY clicks into market orders inside your own terminal</b> — no password is ever stored here, and rotating the token revokes everything.</li>
           <li>Tools → Options → <b>Expert Advisors</b> → tick <i>“Allow WebRequest for listed URL”</i> → add exactly:
             <div className="flex items-center gap-2 mt-1">
               <code className="px-2 py-0.5 rounded bg-black/40 text-[var(--color-accent)] select-all">{origin}</code>
@@ -157,7 +157,7 @@ export default function Mt5App({ appUrl }: { appUrl: string }) {
 
       <div className="card p-4 text-xs text-[var(--color-muted)] space-y-1">
         <p><b className="text-white">How it works:</b> Your MT5 login/password never leaves your PC. A tiny EA (<a className="text-[var(--color-accent)] underline" href="/empire_bridge.mq5" download>empire_bridge.mq5</a>) running in your terminal pushes account data, live quotes and positions here with a scoped per-account token.</p>
-        <p><b className="text-white">Trading (v2):</b> SELL/BUY yahan click karo → server sirf intent queue karta hai → aapka apna terminal usse <b>market order ke roop me execute</b> karta hai aur broker ka seedha verdict (fill ticket ya rejection reason) wapas dikhata hai. Server ke paas credentials hai hi nahi — wo khud kuch execute nahi kar sakta.</p>
+        <p><b className="text-white">Trading (v2):</b> click SELL/BUY here → the server just queues your intent → your own terminal executes it as a <b>market order</b> and reports the broker verdict (fill ticket or rejection reason) back. Passwords can never be stored on the server.</p>
         <p><b className="text-white">Honest status:</b> until an EA actually connects, every account shows “waiting for first sync” — nothing here is simulated, not even prices.</p>
       </div>
 
@@ -317,7 +317,7 @@ export default function Mt5App({ appUrl }: { appUrl: string }) {
                           <td className="px-2">{t.inJournal && <span className="badge badge-live">in journal</span>}</td>
                         </tr>
                       ))}
-                      {trips.length === 0 && <tr><td colSpan={12} className="py-2 text-[var(--color-muted)]">No closed trades yet — jab trade close hoga, terminal sync ke baad yahan history banegi.</td></tr>}
+                      {trips.length === 0 && <tr><td colSpan={12} className="py-2 text-[var(--color-muted)]">No trip reported yet — first BUY/SELL command + exit completes a trip, broker ticket serves as proof</td></tr>}
                     </tbody>
                   </table>
                 </div>

@@ -43,13 +43,13 @@ export default function MessagesApp({ items }: { items: Item[] }) {
         <h3 className="font-semibold">Start a chat</h3>
         <input
           className="input"
-          placeholder="Empire user ka naam ya email likho…"
+          placeholder="Search an Empire member by name or email…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
         {searching && results.length === 0 && <p className="text-xs text-[var(--color-muted)]">searching…</p>}
         {!searching && results.length === 0 && q.trim() && (
-          <p className="text-xs text-[var(--color-muted)]">koi user nahi mila</p>
+          <p className="text-xs text-[var(--color-muted)]">No members found</p>
         )}
         {results.length > 0 && (
           <div className="divide-y divide-[var(--color-border)]">
@@ -71,7 +71,7 @@ export default function MessagesApp({ items }: { items: Item[] }) {
         <h3 className="font-semibold">Your conversations</h3>
         {items.length === 0 && (
           <div className="card p-5 text-sm text-[var(--color-muted)]">
-            Abhi koi chat nahi — upar se kisi Empire user se shuru karo. Sab members-only, kuch public nahi.
+            No conversations yet — start one above with any Empire member. All threads are members-only.
           </div>
         )}
         {items.map((it) => (

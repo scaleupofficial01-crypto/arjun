@@ -30,7 +30,7 @@ export default function MeetClient({
     e.preventDefault();
     const name = code.trim();
     if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{2,63}$/.test(name)) {
-      setError("Meeting code: 3-64 chars — sirf letters/numbers/- aur _");
+      setError("Code must be 3–64 characters: letters, numbers, hyphens or underscores.");
       return;
     }
     setError(null);
@@ -57,8 +57,8 @@ export default function MeetClient({
             <div className="text-2xl">＋</div>
             <h2 className="text-lg font-semibold mt-1">Create meeting</h2>
             <p className="text-xs text-[var(--color-muted)] mt-1 leading-relaxed">
-              Naya meeting code banta hai — bas meeting kholo aur code doston ko
-              batao. Camera lobby ke baad seedha room.
+              Generates a fresh meeting code instantly — start the room, then share the
+              code with any Empire member. You will land on the camera lobby next.
             </p>
           </div>
           <button
@@ -76,7 +76,7 @@ export default function MeetClient({
             <div className="text-2xl">⌨︎</div>
             <h2 className="text-lg font-semibold mt-1">Join with code</h2>
             <p className="text-xs text-[var(--color-muted)] mt-1 leading-relaxed">
-              Jis user ne meeting banayi usse code lo, yahan daalo.
+              Enter the code shared with you by the meeting host.
             </p>
           </div>
           <form onSubmit={onEnter} className="mt-auto space-y-3">
@@ -101,12 +101,12 @@ export default function MeetClient({
       <div className="mt-6 w-full max-w-2xl space-y-3">
         {!lkConfigured && (
           <div className="badge badge-setup w-full justify-center py-2">
-            Setup required — server env me LiveKit keys baaki hain.
+            Setup required — LiveKit keys are missing from the server environment.
           </div>
         )}
         <p className="text-[11px] text-center text-[var(--color-muted)]">
-          Google Meet jaisa flow • Joining as <span className="text-white">{defaultName}</span> •
-          sirf logged-in Empire users andar aa sakte hain
+          Secure in-app meetings • Joining as <span className="text-white">{defaultName}</span> •
+          signed-in Empire members only
         </p>
       </div>
     </main>

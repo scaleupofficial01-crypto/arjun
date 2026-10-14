@@ -34,8 +34,8 @@ export default function LiveKitStage({
         if (!r.ok || !data.token || !data.url) {
           setError(
             r.status === 503
-              ? "Meet abhi configure nahi hua (server env me LiveKit keys baaki)"
-              : data.error ?? "Token nahi mila",
+              ? "The meeting service is not configured on the server yet"
+              : data.error ?? "Could not get an access token",
           );
           return;
         }
@@ -94,8 +94,8 @@ export default function LiveKitStage({
             <span className="text-[var(--color-accent)]">Empire</span> Meet
           </h1>
           <p className="text-xs text-[var(--color-muted)]">
-            Meeting: <span className="font-mono text-white">{room}</span> — camera/mic check
-            karo, phir Join. Browser mic+camera permission mangega — allow karo.
+            Meeting: <span className="font-mono text-white">{room}</span> — check your camera
+            and mic, then join. The browser will ask for camera and microphone access.
           </p>
         </div>
         {error && <p className="text-sm text-center text-[var(--color-loss)]">{error}</p>}
@@ -107,13 +107,13 @@ export default function LiveKitStage({
             />
           ) : (
             <p className="text-sm text-[var(--color-muted)] text-center py-6">
-              Lobby yahan aayegi jab LiveKit keys set ho jayengi.
+              The lobby will appear here once LiveKit is configured.
             </p>
           )}
         </div>
         <p className="text-[11px] text-center text-[var(--color-muted)]">
-          Room ka naam share karo — jo Empire pe login rakhta hai, wahi andar aa sakta hai.
-          2-hour security token.
+          Share the room name — any signed-in Empire member can join inside. The access token
+          expires in 2 hours.
         </p>
       </div>
     </main>

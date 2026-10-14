@@ -64,7 +64,7 @@ export default async function AdminPage() {
           <div className="card p-6 border-amber-500/40 bg-amber-500/5">
             <span className="badge badge-setup">403 — admin only</span>
             <p className="text-sm text-[var(--color-muted)] mt-3">
-              Yeh area sirf ADMIN role ke liye hai (server-enforced). Aapka role: <b>{user.role}</b>.
+              This area requires the ADMIN role (server-enforced). Your role: <b>{user.role}</b>.
             </p>
           </div>
         ) : (

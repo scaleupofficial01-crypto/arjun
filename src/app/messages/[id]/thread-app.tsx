@@ -24,7 +24,7 @@ export default function ThreadApp({ conversationId }: { conversationId: string }
         if (stickRef.current) bottomRef.current?.scrollIntoView({ block: "end" });
       }
     } catch {
-      setErr("Load failed — retry hoga");
+      setErr("Failed to load — retrying automatically");
     }
   }
 
@@ -72,7 +72,7 @@ export default function ThreadApp({ conversationId }: { conversationId: string }
         const el = e.currentTarget;
         stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
       }}>
-        {msgs.length === 0 && <p className="text-xs text-[var(--color-muted)] text-center py-6">Pehla message bhejo 👋</p>}
+        {msgs.length === 0 && <p className="text-xs text-[var(--color-muted)] text-center py-6">Send the first message 👋</p>}
         {msgs.map((m) => (
           <div key={m.id} className={`flex ${m.mine ? "justify-end" : "justify-start"}`}>
             <div className={`max-w-[75%] rounded-xl px-3 py-2 text-sm ${m.mine ? "bg-[#f59e0b] text-[#0a0f1a]" : "card"}`}>

@@ -40,7 +40,7 @@ export default function FeedApp({ posts, me }: { posts: Post[]; me: string }) {
         setText("");
         router.refresh();
       } else {
-        setErr("Post publish nahi hui");
+        setErr("Could not publish the post");
       }
     } finally {
       setBusy(false);
@@ -61,7 +61,7 @@ export default function FeedApp({ posts, me }: { posts: Post[]; me: string }) {
       <form onSubmit={(e) => void publish(e)} className="card p-5 space-y-3">
         <textarea
           className="input min-h-[84px] resize-y"
-          placeholder={`Trade note ya analysis post karo, ${me}…`}
+          placeholder={`Share a trade note or analysis, ${me}…`}
           value={text}
           onChange={(e) => setText(e.target.value)}
           maxLength={4000}
@@ -85,14 +85,14 @@ export default function FeedApp({ posts, me }: { posts: Post[]; me: string }) {
         </div>
         {err && <p className="text-xs text-[var(--color-loss)]">{err}</p>}
         <p className="text-[10px] text-[var(--color-muted)]">
-          Visibility server pe enforce hoti hai — followers-only posts sirf followers ko dikhte hain.
+          Visibility is enforced server-side — followers-only posts are visible to your followers alone.
         </p>
       </form>
 
       <div className="space-y-3">
         {posts.length === 0 && (
           <div className="card p-5 text-sm text-[var(--color-muted)]">
-            Feed khaali hai — pehla post tumhara hona chahiye 😉
+            The feed is empty — make the first post
           </div>
         )}
         {posts.map((p) => (

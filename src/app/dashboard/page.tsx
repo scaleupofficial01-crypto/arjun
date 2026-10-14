@@ -5,9 +5,7 @@ import { integrationStatus } from "@/lib/env";
 import { DEMO_MODE, DEMO_USER } from "@/lib/demo";
 import { LogoutButton, LogoutEverywhereButton } from "@/components/logout-buttons";
 import Tilt from "@/components/tilt";
-import nextDynamic from "next/dynamic";
-
-const EmpireScene = nextDynamic(() => import("@/components/empire-scene"), { ssr: false });
+import EmpireScene from "@/components/empire-scene";
 
 export const metadata = { title: "Dashboard — Empire" };
 export const dynamic = "force-dynamic";

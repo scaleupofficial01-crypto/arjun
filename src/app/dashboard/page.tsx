@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/session";
-import { integrationStatus } from "@/lib/env";
 import { DEMO_MODE, DEMO_USER } from "@/lib/demo";
 import { LogoutButton, LogoutEverywhereButton } from "@/components/logout-buttons";
 import Tilt from "@/components/tilt";
@@ -10,17 +9,6 @@ import EmpireScene from "@/components/empire-scene";
 export const metadata = { title: "Dashboard — Empire" };
 export const dynamic = "force-dynamic";
 
-function Pill({ ok, label }: { ok: boolean; label: string }) {
-  return (
-    <span className={`badge ${ok ? "badge-live" : "badge-setup"}`}>
-      <span
-        className="inline-block h-1.5 w-1.5 rounded-full"
-        style={{ background: ok ? "#4ade80" : "#fbbf24" }}
-      />
-      {label}: {ok ? "connected" : "setup required"}
-    </span>
-  );
-}
 
 const modules = [
   { name: "Trading Journal", href: "/journal", phase: null, ready: true, desc: "Trades, groups, screenshots, CSV/Excel import-export. P&L always server-computed." },
@@ -41,7 +29,6 @@ export default async function DashboardPage() {
   const isDemo = !sessionUser && DEMO_MODE;
   const user = sessionUser ?? (DEMO_MODE ? DEMO_USER : null);
   if (!user) redirect("/login");
-  const integ = integrationStatus();
 
   return (
     <main className="min-h-screen max-w-6xl mx-auto px-6 py-8 space-y-8">
@@ -80,26 +67,6 @@ export default async function DashboardPage() {
         )}
       </section>
 
-      <section className="card p-5">
-        <h2 className="font-semibold mb-3">Integrations</h2>
-        <div className="flex flex-wrap gap-2">
-          <Pill ok={integ.database} label="Database" />
-          <Pill ok={integ.redis} label="Redis cache" />
-          <Pill ok={integ.email} label="Email" />
-          <Pill ok={integ.googleOAuth} label="Google Sign-In" />
-          <Pill ok={Boolean(integ.realtime.provider) && !integ.realtime.misconfigured} label="Realtime" />
-          <Pill ok={integ.livekit} label="LiveKit / Meet" />
-          <Pill ok={integ.mt5} label="MT5 bridge" />
-        </div>
-        {!integ.livekit && (
-          <p className="mt-3 text-xs text-[var(--color-muted)]">
-            LiveKit keys add karo to Meet green ho jayega.
-          </p>
-        )}
-        <p className="mt-3 text-xs text-[var(--color-muted)]">
-          Missing pieces stay visibly marked until the required key is added to /credentials/.env — nothing here is faked as working.
-        </p>
-      </section>
 
       <section className="grid md:grid-cols-3 sm:grid-cols-2 gap-4">
         {modules.map((m) =>

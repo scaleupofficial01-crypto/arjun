@@ -19,9 +19,29 @@ function tvSymbol(raw: string): string {
 export default function ChartsApp({ initialSymbol }: { initialSymbol: string }) {
   const [symbol, setSymbol] = useState(initialSymbol);
   const tvSym = tvSymbol(symbol);
+  const fsRef = useRef<HTMLDivElement>(null);
+  const [isFs, setIsFs] = useState(false);
+
+  useEffect(() => {
+    const onFs = () => setIsFs(Boolean(document.fullscreenElement));
+    document.addEventListener("fullscreenchange", onFs);
+    return () => document.removeEventListener("fullscreenchange", onFs);
+  }, []);
+
+  const toggleFullscreen = async () => {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await fsRef.current?.requestFullscreen();
+    } catch {
+      /* browser blocked — button stays inert */
+    }
+  };
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-8 space-y-4">
+    <div
+      ref={fsRef}
+      className={`max-w-6xl mx-auto px-6 py-8 space-y-4 ${isFs ? "max-w-none h-screen overflow-auto bg-[var(--color-bg,#0b0f1a)]" : ""}`}
+    >
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-xl font-bold">Live Charts</h1>
         <form
@@ -36,6 +56,13 @@ export default function ChartsApp({ initialSymbol }: { initialSymbol: string }) 
           <button className="btn-primary !py-1.5 text-sm">Load</button>
         </form>
         <span className="badge badge-live">TradingView advanced chart</span>
+        <button
+          onClick={toggleFullscreen}
+          className="ml-auto px-3 py-1.5 text-sm rounded-lg border border-[var(--color-border)] hover:border-[var(--color-accent)] text-[var(--color-text)]"
+          title="Chart ko full screen mein kholen (Esc = exit)"
+        >
+          {isFs ? "✕ Exit fullscreen (Esc)" : "⛶ Fullscreen"}
+        </button>
       </div>
 
       <div className="text-xs text-[var(--color-muted)] card p-3 space-y-1">
@@ -55,12 +82,14 @@ export default function ChartsApp({ initialSymbol }: { initialSymbol: string }) 
 
       {/* Official embed — bug #4 rule: embed-widget-advanced-chart.js inside
           .tradingview-widget-container. React double-mount guard via key. */}
-      <TvEmbed key={`tv-${symbol}`} tvSym={tvSym} />
+      <div>
+        <TvEmbed key={`tv-${symbol}`} tvSym={tvSym} fullscreen={isFs} />
+      </div>
     </div>
   );
 }
 
-function TvEmbed({ tvSym }: { tvSym: string }) {
+function TvEmbed({ tvSym, fullscreen }: { tvSym: string; fullscreen?: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -104,8 +133,13 @@ function TvEmbed({ tvSym }: { tvSym: string }) {
   }, [tvSym]);
 
   return (
-    <div className="card p-1">
-      <div ref={containerRef} style={{ height: "calc(100vh - 300px)", minHeight: 560 }} />
+    <div className={`card p-1 ${fullscreen ? "border-0 !p-0" : ""}`}>
+      <div
+        ref={containerRef}
+        style={fullscreen
+          ? { height: "calc(100vh - 235px)", minHeight: 300 }
+          : { height: "calc(100vh - 300px)", minHeight: 560 }}
+      />
     </div>
   );
 }

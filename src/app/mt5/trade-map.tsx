@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   createChart,
   LineSeries,
@@ -8,26 +8,128 @@ import {
   createSeriesMarkers,
   ColorType,
   type IChartApi,
+  type ISeriesApi,
   type UTCTimestamp,
 } from "lightweight-charts";
 import { buildTradeMap, type MapDeal, type SymbolMap } from "@/lib/trade-map";
+import {
+  makeDrawing,
+  normalizeChartData,
+  drawingToSegments,
+  DRAWING_COLORS,
+  type Anchor,
+  type Drawing,
+  type DrawingType,
+} from "@/lib/chart-drawings";
+
+type Tool = "cursor" | DrawingType;
+type SaveState = "idle" | "loading" | "saving" | "saved" | "error";
+type Candle = { time: number; open: number; high: number; low: number; close: number };
+
+const TOOLS: { id: Tool; label: string; hint: string }[] = [
+  { id: "cursor", label: "⬙", hint: "cursor" },
+  { id: "trendline", label: "╱", hint: "trendline — click 2 points" },
+  { id: "hline", label: "—", hint: "horizontal line — click price" },
+  { id: "vline", label: "│", hint: "vertical line — click time" },
+];
 
 /**
- * Trade Map — synced MT5 deals on a chart, TradingView-style:
- * ▲ entry arrows, ▼ exit arrows, and a green/red connector per round-trip.
- * Plotted from the deals' OWN prices (no external market feed — free tier
- * has no forex/metals OHLC; nothing is faked as candles).
+ * Trade Map — synced MT5 deals on real market candles, TradingView-style:
+ * ▲ BUY/SELL labels, ▼ EXIT ±pnl labels, green/red connectors, dashed
+ * entry/exit levels — plus drawing tools (trendline / hline / vline) that
+ * PERSIST server-side per account+symbol (/api/charts/layout), along with
+ * the visible zoom/pan range, exactly like TradingView's saved layouts.
  */
-export default function TradeMap({ deals }: { deals: MapDeal[] }) {
+export default function TradeMap({ deals, accountId }: { deals: MapDeal[]; accountId?: string }) {
   const maps = useMemo(() => buildTradeMap(deals), [deals]);
   const [symbol, setSymbol] = useState<string | null>(null);
-  const [candles, setCandles] = useState<{ time: number; open: number; high: number; low: number; close: number }[]>([]);
+  const [candles, setCandles] = useState<Candle[]>([]);
   const [candleSrc, setCandleSrc] = useState<{ label: string | null; proxyNote: string | null }>({ label: null, proxyNote: null });
+
+  const [tool, setTool] = useState<Tool>("cursor");
+  const [drawings, setDrawings] = useState<Drawing[]>([]);
+  const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [pendingAnchorTime, setPendingAnchorTime] = useState<number | null>(null);
+
   const hostRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
+  const anchorSerRef = useRef<ISeriesApi<"Candlestick"> | ISeriesApi<"Line"> | null>(null);
+  const drawingSerRef = useRef<Map<string, ISeriesApi<"Line">[]>>(new Map());
+  const candleRef = useRef<Candle[]>([]);
+
+  // live refs so chart event closures always see the latest UI state
+  const toolRef = useRef<Tool>(tool);
+  const pendingRef = useRef<Anchor | null>(null);
+  const drawingsRef = useRef<Drawing[]>([]);
+  const rangeRef = useRef<{ from: number; to: number } | null>(null);
+  const pendingRangeRef = useRef<{ from: number; to: number } | null>(null);
+  const loadedKeyRef = useRef<string | null>(null);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => { toolRef.current = tool; }, [tool]);
+  useEffect(() => { drawingsRef.current = drawings; }, [drawings]);
 
   const current: SymbolMap | null =
     maps.find((m) => m.symbol === (symbol ?? maps[0]?.symbol)) ?? maps[0] ?? null;
+
+  /** Server persistence key for this chart (per account + symbol), like TV's layout per chart. */
+  const layoutKey = accountId && current ? `mt5:${accountId}|${current.symbol}` : null;
+
+  // ---------- persistence ----------
+  const persistNow = useCallback(async () => {
+    if (!layoutKey || loadedKeyRef.current !== layoutKey) return;
+    const [scope, sym] = layoutKey.split("|");
+    setSaveState("saving");
+    try {
+      const r = await fetch(`/api/charts/layout?scope=${encodeURIComponent(scope)}&symbol=${encodeURIComponent(sym)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: { drawings: drawingsRef.current, state: { visibleRange: rangeRef.current ?? undefined } } }),
+      });
+      setSaveState(r.ok ? "saved" : "error");
+    } catch {
+      setSaveState("error");
+    }
+  }, [layoutKey]);
+
+  const scheduleSave = useCallback(() => {
+    if (!layoutKey || loadedKeyRef.current !== layoutKey) return;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => { void persistNow(); }, 700);
+  }, [layoutKey, persistNow]);
+
+  /** Load saved drawings + interaction state for this chart on open/symbol switch. */
+  useEffect(() => {
+    if (!layoutKey) return;
+    const [scope, sym] = layoutKey.split("|");
+    loadedKeyRef.current = null;
+    setDrawings([]);
+    setSaveState("loading");
+    let cancelled = false;
+    fetch(`/api/charts/layout?scope=${encodeURIComponent(scope)}&symbol=${encodeURIComponent(sym)}`)
+      .then(async (r) => (r.ok ? ((await r.json()) as { data: unknown }) : { data: null }))
+      .then(({ data }) => {
+        if (cancelled) return;
+        const parsed = normalizeChartData(data);
+        pendingRangeRef.current = parsed.state.visibleRange ?? null;
+        rangeRef.current = parsed.state.visibleRange ?? null;
+        setDrawings(parsed.drawings);
+        loadedKeyRef.current = layoutKey;
+        setSaveState(parsed.drawings.length ? "saved" : "idle");
+        // chart may already exist — restore the saved zoom window now
+        const vr = parsed.state.visibleRange;
+        if (vr && chartRef.current) {
+          try { chartRef.current.timeScale().setVisibleLogicalRange(vr as never); } catch { /* resets on next build */ }
+        }
+      })
+      .catch(() => { if (!cancelled) setSaveState("error"); });
+    return () => { cancelled = true; };
+  }, [layoutKey]);
+
+  /** Autosave drawings + zoom whenever they change (TV-style background save). */
+  const scheduleSaveRef = useRef(scheduleSave);
+  useEffect(() => { scheduleSaveRef.current = scheduleSave; }, [scheduleSave]);
+  useEffect(() => { scheduleSaveRef.current(); }, [drawings]);
 
   /** Real market candles behind the trades (when a free real feed exists). */
   useEffect(() => {
@@ -38,7 +140,7 @@ export default function TradeMap({ deals }: { deals: MapDeal[] }) {
     fetch(`/api/mt5/candles?symbol=${encodeURIComponent(current.symbol)}`)
       .then(async (r) => {
         if (!r.ok) return null;
-        const d = (await r.json()) as { candles?: { time: number; open: number; high: number; low: number; close: number }[]; source?: string; proxyNote?: string | null };
+        const d = (await r.json()) as { candles?: Candle[]; source?: string; proxyNote?: string | null };
         return d.candles ? d : null;
       })
       .then((d) => {
@@ -56,6 +158,7 @@ export default function TradeMap({ deals }: { deals: MapDeal[] }) {
     const host = hostRef.current;
     if (!host || !current) return;
     host.innerHTML = "";
+    drawingSerRef.current.clear();
     const chart = createChart(host, {
       autoSize: true,
       height: 380,
@@ -70,12 +173,14 @@ export default function TradeMap({ deals }: { deals: MapDeal[] }) {
       },
       timeScale: { borderColor: "rgba(148,163,184,0.25)", timeVisible: true },
       rightPriceScale: { borderColor: "rgba(148,163,184,0.25)" },
+      crosshair: { mode: 0 },
     });
     chartRef.current = chart;
 
     // Real market candles as the backdrop (when available)
+    let candleSeries: ISeriesApi<"Candlestick"> | null = null;
     if (candles.length > 0) {
-      const cs = chart.addSeries(CandlestickSeries, {
+      candleSeries = chart.addSeries(CandlestickSeries, {
         upColor: "#089981",
         downColor: "#f23645",
         wickUpColor: "#1f7a44",
@@ -83,12 +188,13 @@ export default function TradeMap({ deals }: { deals: MapDeal[] }) {
         borderVisible: false,
         priceLineVisible: false,
       });
-      cs.setData(
+      candleSeries.setData(
         candles.map((c) => ({
           time: c.time as UTCTimestamp, open: c.open, high: c.high, low: c.low, close: c.close,
         })),
       );
     }
+    candleRef.current = candles;
 
     // Price trace across all synced deal points (grey, thin — exact deal times)
     const trace = chart.addSeries(LineSeries, { color: "#94a3b8", lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false });
@@ -98,6 +204,7 @@ export default function TradeMap({ deals }: { deals: MapDeal[] }) {
         .filter((p) => (seen.has(p.time) ? false : (seen.add(p.time), true)))
         .map((p) => ({ time: p.time as UTCTimestamp, value: p.value })),
     );
+    anchorSerRef.current = candleSeries ?? trace;
 
     // TradingView-position style: dashed entry/exit level lines + solid win/loss connector
     for (const seg of current.segments) {
@@ -115,10 +222,8 @@ export default function TradeMap({ deals }: { deals: MapDeal[] }) {
           { time: seg.to.time as UTCTimestamp, value },
         ]);
       };
-      // dashed level at entry price and at exit price (TV's position overlay)
       mk(seg.from.value, "rgba(100,116,139,0.8)", 1, true);
       mk(seg.to.value, "rgba(100,116,139,0.8)", 1, true);
-      // solid connector, green = win / red = loss
       const conn = chart.addSeries(LineSeries, {
         color: seg.win === null ? "#64748b" : seg.win ? "#22c55e" : "#ef4444",
         lineWidth: 2,
@@ -146,12 +251,123 @@ export default function TradeMap({ deals }: { deals: MapDeal[] }) {
       })),
     );
 
+    // ----- drawing tools: click-chart interactions -----
+    const resolveAnchor = (x: number, y: number): Anchor | null => {
+      const price = anchorSerRef.current?.coordinateToPrice(y);
+      let time: number | null = null;
+      const t = chart.timeScale().coordinateToTime(x);
+      if (t !== null && t !== undefined) time = Number(t);
+      if (time === null) {
+        // fallback: nearest loaded candle bar (weekends/gaps produce whitespace)
+        const logical = chart.timeScale().coordinateToLogical(x);
+        const bars = candleRef.current;
+        if (logical !== null && bars.length > 0) {
+          const i = Math.max(0, Math.min(bars.length - 1, Math.round(Number(logical))));
+          time = bars[i].time;
+        }
+      }
+      if (time === null || price === null || price === undefined) return null;
+      return { time, price: Number(price) };
+    };
+
+    // Raw pointer events instead of subscribeClick: the chart's own click
+    // subscription swallows the second click inside its double-click window,
+    // which kills fast two-anchor trendline drawing. Movement >4px = pan, ignored.
+    let downPos: { x: number; y: number } | null = null;
+    const onDown = (e: PointerEvent) => { downPos = { x: e.clientX, y: e.clientY }; };
+    const onUp = (e: PointerEvent) => {
+      if (!downPos) return;
+      const moved = Math.abs(e.clientX - downPos.x) + Math.abs(e.clientY - downPos.y);
+      downPos = null;
+      if (moved > 4) return;
+      const active = toolRef.current;
+      if (active === "cursor") return;
+      const rect = host.getBoundingClientRect();
+      const anchor = resolveAnchor(e.clientX - rect.left, e.clientY - rect.top);
+      if (!anchor) return;
+      if (active === "hline" || active === "vline") {
+        const d = makeDrawing(active, [anchor]);
+        if (d) setDrawings((prev) => [...prev, d]);
+        setTool("cursor");
+        return;
+      }
+      // trendline: two clicks
+      if (!pendingRef.current) {
+        pendingRef.current = anchor;
+        setPendingAnchorTime(anchor.time);
+        return;
+      }
+      const d = makeDrawing("trendline", [pendingRef.current, anchor]);
+      pendingRef.current = null;
+      setPendingAnchorTime(null);
+      if (d) setDrawings((prev) => [...prev, d]);
+      setTool("cursor");
+    };
+    host.addEventListener("pointerdown", onDown);
+    host.addEventListener("pointerup", onUp);
+
+    // ----- persist the visible zoom/pan window (interaction state) -----
+    let rangeTimer: ReturnType<typeof setTimeout> | null = null;
+    chart.timeScale().subscribeVisibleLogicalRangeChange((r) => {
+      if (!r) return;
+      rangeRef.current = { from: Number(r.from), to: Number(r.to) };
+      if (rangeTimer) clearTimeout(rangeTimer);
+      rangeTimer = setTimeout(() => scheduleSaveRef.current(), 800);
+    });
+
     chart.timeScale().fitContent();
+    // saved zoom window wins over fitContent when present
+    const saved = pendingRangeRef.current;
+    if (saved) {
+      pendingRangeRef.current = null;
+      try { chart.timeScale().setVisibleLogicalRange(saved as never); rangeRef.current = saved; } catch { /* first paint */ }
+    }
     return () => {
+      if (rangeTimer) clearTimeout(rangeTimer);
+      host.removeEventListener("pointerdown", onDown);
+      host.removeEventListener("pointerup", onUp);
       chart.remove();
       chartRef.current = null;
+      anchorSerRef.current = null;
+      drawingSerRef.current.clear();
     };
   }, [current, candles]);
+
+  // ----- (re)render drawing series whenever drawings or the chart change -----
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    for (const series of drawingSerRef.current.values()) series.forEach((s) => { try { chart.removeSeries(s); } catch { /* gone */ } });
+    drawingSerRef.current.clear();
+    const bars = candleRef.current;
+    const fallback = current?.points ?? [];
+    const times = bars.length ? bars.map((b) => b.time) : fallback.map((p) => p.time);
+    const lows = bars.length ? bars.map((b) => b.low) : fallback.map((p) => p.value);
+    const highs = bars.length ? bars.map((b) => b.high) : fallback.map((p) => p.value);
+    if (times.length === 0) return;
+    const wb = {
+      minTime: Math.min(...times), maxTime: Math.max(...times),
+      minPrice: Math.min(...lows), maxPrice: Math.max(...highs),
+    };
+    for (const d of drawings) {
+      const series: ISeriesApi<"Line">[] = [];
+      for (const seg of drawingToSegments(d, wb)) {
+        const s = chart.addSeries(LineSeries, {
+          color: d.color,
+          lineWidth: 2,
+          priceLineVisible: false,
+          lastValueVisible: false,
+          crosshairMarkerVisible: false,
+        });
+        s.setData([
+          { time: seg.from.time as UTCTimestamp, value: seg.from.price },
+          { time: seg.to.time as UTCTimestamp, value: seg.to.price },
+        ]);
+        series.push(s);
+      }
+      drawingSerRef.current.set(d.id, series);
+    }
+  }, [drawings, current, candles]);
 
   if (maps.length === 0) {
     return (
@@ -163,6 +379,23 @@ export default function TradeMap({ deals }: { deals: MapDeal[] }) {
 
   const wins = current?.segments.filter((s) => s.win === true).length ?? 0;
   const losses = current?.segments.filter((s) => s.win === false).length ?? 0;
+  const removeDrawing = (id: string) => setDrawings((prev) => prev.filter((d) => d.id !== id));
+  const clearAll = () => {
+    setDrawings([]);
+    if (!layoutKey) return;
+    const [scope, sym] = layoutKey.split("|");
+    void fetch(`/api/charts/layout?scope=${encodeURIComponent(scope)}&symbol=${encodeURIComponent(sym)}`, { method: "DELETE" }).catch(() => {});
+  };
+  const drawingLabel = (d: Drawing) => {
+    if (d.type === "trendline") return `trendline @ ${d.anchors[0].price.toFixed(2)}`;
+    if (d.type === "hline") return `hline ${d.anchors[0].price.toFixed(2)}`;
+    return `vline ${new Date(d.anchors[0].time * 1000).toISOString().slice(0, 10)}`;
+  };
+  const saveText =
+    saveState === "loading" ? "loading saved drawings…" :
+    saveState === "saving" ? "saving…" :
+    saveState === "saved" ? "saved ✓" :
+    saveState === "error" ? "save failed" : "";
 
   return (
     <div className="space-y-2">
@@ -183,11 +416,48 @@ export default function TradeMap({ deals }: { deals: MapDeal[] }) {
           {current?.segments.length ?? 0} round-trips · <span className="text-[var(--color-profit)]">{wins}W</span> / <span className="text-[var(--color-loss)]">{losses}L</span>
         </span>
       </div>
-      <div ref={hostRef} className="rounded-lg overflow-hidden border border-[var(--color-border)]" />
+
+      <div className="flex flex-wrap items-center gap-1.5 text-xs">
+        <span className="text-[10px] uppercase tracking-wide text-[var(--color-muted)] mr-1">draw</span>
+        {TOOLS.map((t) => (
+          <button
+            key={t.id}
+            title={t.hint}
+            onClick={() => { setTool(t.id); pendingRef.current = null; setPendingAnchorTime(null); }}
+            className={`w-7 h-7 rounded border font-bold transition ${tool === t.id ? "border-[var(--color-accent)] text-[var(--color-accent)] bg-[var(--color-accent)]/10" : "border-[var(--color-border)] text-[var(--color-muted)] hover:text-[var(--color-text)]"}`}
+          >
+            {t.label}
+          </button>
+        ))}
+        {tool === "trendline" && pendingAnchorTime !== null && (
+          <span className="text-[var(--color-accent)]">first anchor set — click the second point</span>
+        )}
+        {tool !== "cursor" && !(tool === "trendline" && pendingAnchorTime !== null) && (
+          <span className="text-[var(--color-muted)]">click on chart…</span>
+        )}
+        <span className="ml-auto flex items-center gap-2 min-w-[120px] justify-end">
+          {saveText && <span className={`text-[10px] ${saveState === "error" ? "text-[var(--color-loss)]" : "text-[var(--color-muted)]"}`}>{saveText}</span>}
+          {drawings.length > 0 && (
+            <button onClick={clearAll} className="text-[10px] text-[var(--color-loss)] underline">clear all</button>
+          )}
+        </span>
+      </div>
+
+      <div ref={hostRef} className={`rounded-lg overflow-hidden border ${tool !== "cursor" ? "border-[var(--color-accent)]/60" : "border-[var(--color-border)]"} cursor-${tool === "cursor" ? "default" : "crosshair"}`} />
+      <div className="flex flex-wrap gap-1.5 min-h-[22px]" aria-label="drawings">
+        {drawings.map((d) => (
+          <span key={d.id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-[var(--color-border)] text-[10px] text-[var(--color-muted)]">
+            <span className="inline-block w-2 h-2 rounded-full" style={{ background: d.color }} />
+            {drawingLabel(d)}
+            <button onClick={() => removeDrawing(d.id)} className="text-[var(--color-loss)] hover:font-bold" title="delete drawing">×</button>
+          </span>
+        ))}
+      </div>
       <p className="text-[11px] text-[var(--color-muted)]">
-        ▲ entry · ▼ exit · connector green = profitable round-trip, red = losing (from synced deal profit).
+        ▲ entry (side + volume) · ▼ exit (result) · green/red connector = profitable/losing round-trip.
+        Drawings and your zoom level are saved to your account automatically (TradingView-style).
         {candleSrc.label
-          ? <> Candles: {candleSrc.label}{candleSrc.proxyNote ? ` (${candleSrc.proxyNote})` : ""}; markers sit on your own synced deal prices.</>
+          ? <> Candles: {candleSrc.label}{candleSrc.proxyNote ? ` (${candleSrc.proxyNote})` : ""}.</>
           : <> Price path is drawn from your own deal prices — external market candles for {current?.symbol ?? "this symbol"} need a paid feed on the free tier; nothing here is faked.</>}
       </p>
     </div>

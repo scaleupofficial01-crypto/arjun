@@ -188,11 +188,12 @@ model ChartLayout {
   id        String   @id @default(cuid())
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scope     String   @default("") // e.g. "" (charts page) or "mt5:<accountId>" (trade map)
   symbol    String
-  data      Json // raw TradingView layout store captured client-side
+  data      Json // drawing tools (trendlines, hlines, vlines) + chart interaction state, captured client-side
   updatedAt DateTime @updatedAt
 
-  @@unique([userId, symbol])
+  @@unique([userId, scope, symbol])
   @@map("chart_layouts")
 }
 

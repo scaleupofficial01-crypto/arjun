@@ -236,7 +236,7 @@ export default function Mt5App({ appUrl }: { appUrl: string }) {
             </table>
           </div>
           <h3 className="text-sm font-medium text-[var(--color-accent)]">Chart — your trades on real market candles</h3>
-          <TradeMap deals={detail.deals.map((d) => ({ ...d, dealtAt: String(d.dealtAt) }))} />
+          <TradeMap accountId={detail.account.id} deals={detail.deals.map((d) => ({ ...d, dealtAt: String(d.dealtAt) }))} />
 
           {(() => {
             const deals = detail.deals.map((d) => ({ ...d, dealtAt: String(d.dealtAt) }));

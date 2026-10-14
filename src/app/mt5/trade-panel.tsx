@@ -156,7 +156,7 @@ export default function TradePanel({
   }, [accountId, symbol, volume, watchCommand]);
 
   const spread = quote ? Math.abs(Number(quote.ask) - Number(quote.bid)) : null;
-  const btnBase = "flex-1 rounded-xl px-4 py-3 text-left transition disabled:opacity-40 disabled:cursor-not-allowed";
+  const btnBase = "flex-1 rounded-lg px-3 py-2 text-left transition disabled:opacity-40 disabled:cursor-not-allowed";
   const canTrade = tradingOk;
 
   return (
@@ -195,18 +195,18 @@ export default function TradePanel({
           title={canTrade ? "Market SELL at bid" : "v2 EA chahiye"}
         >
           <div className="text-[10px] tracking-wide opacity-80">SELL</div>
-          <div className="text-xl font-bold font-mono leading-6">{busy === "SELL" ? "…" : fmt(quote?.bid)}</div>
+          <div className="text-sm font-bold font-mono leading-5">{busy === "SELL" ? "…" : fmt(quote?.bid)}</div>
         </button>
 
         {/* volume stepper — MT5 mobile style: ∨  0.01  ∧ */}
-        <div className="flex flex-col items-center justify-center px-2 rounded-xl border border-[var(--color-border)] bg-black/40 min-w-[104px]">
+        <div className="flex flex-col items-center justify-center px-2 rounded-lg border border-[var(--color-border)] bg-black/40 min-w-[88px]">
           <button
             className="text-sm leading-none text-[var(--color-muted)] hover:text-white"
             onClick={() => setVolume((v) => (Math.max(0.01, Number(v) - 0.01)).toFixed(2))}
             aria-label="volume kam"
           >∨</button>
           <input
-            className="w-16 bg-transparent text-center font-mono text-lg outline-none"
+            className="w-16 bg-transparent text-center font-mono text-base outline-none"
             value={volume}
             onChange={(e) => setVolume(e.target.value)}
             inputMode="decimal"
@@ -225,7 +225,7 @@ export default function TradePanel({
           title={canTrade ? "Market BUY at ask" : "v2 EA chahiye"}
         >
           <div className="text-[10px] tracking-wide opacity-80">BUY</div>
-          <div className="text-xl font-bold font-mono leading-6">{busy === "BUY" ? "…" : fmt(quote?.ask)}</div>
+          <div className="text-sm font-bold font-mono leading-5">{busy === "BUY" ? "…" : fmt(quote?.ask)}</div>
         </button>
       </div>
 

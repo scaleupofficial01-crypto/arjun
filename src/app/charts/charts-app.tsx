@@ -90,21 +90,6 @@ export default function ChartsApp({ initialSymbol }: { initialSymbol: string }) 
         </button>
       </div>
 
-      <div className="text-xs text-[var(--color-muted)] card p-3 space-y-1">
-        <p>
-          <span className="text-[var(--color-profit)] font-medium">✓ Saving (built-in):</span>{" "}
-          jo bhi trendlines/tools aap yahan draw karte ho, TradingView unhe{" "}
-          <b>isi browser me automatically save</b> karta hai — reload ya baad me wapas aane
-          par wo waise-ki-waise milengi.
-        </p>
-        <p>
-          <span className="text-amber-400 font-medium">Note:</span> cross-device account sync
-          free widget me technically possible nahi (TradingView khud parent page ko drawing
-          data nahi deta; wo unki licensed Charting Library ka feature hai). Yahan kuch bhi
-          fake nahi hai. Click-se-trade ke entry arrows + floating P&L lines <a className="text-[var(--color-accent)] underline" href="/mt5">MT5 Sync → Trade Map</a> pe dikhte hain.
-        </p>
-      </div>
-
       {accounts.length > 0 && (
         <TradePanel accounts={accounts} initialSymbol={brokerSymbol(symbol)} />
       )}

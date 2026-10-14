@@ -55,6 +55,13 @@ export default function LiveKitStage({
             <span className="text-[var(--color-accent)]">Empire</span> Meet ·{" "}
             <span className="font-mono">{room}</span>
           </span>
+          <button
+            className="text-xs px-2.5 py-1 rounded-md border border-[var(--color-border)] hover:border-[var(--color-accent)]"
+            onClick={() => void (navigator.clipboard?.writeText(room) ?? Promise.resolve()).catch(() => {})}
+            title="Copy meeting code"
+          >
+            ⧉ copy code
+          </button>
           <span className="text-[11px] text-[var(--color-muted)]">secure in-app room</span>
           <button
             className="ml-auto text-xs px-3 py-1.5 rounded-lg border border-[var(--color-border)] hover:border-[var(--color-accent)]"

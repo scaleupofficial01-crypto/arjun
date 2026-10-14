@@ -56,8 +56,8 @@ export default async function DashboardPage() {
 
       {/* ── 3D hero: the 10-level golden staircase rises behind the title ── */}
       <section className="card relative overflow-hidden p-0 h-52 md:h-60">
-        <EmpireScene className="absolute inset-0" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#0a0f1acc] via-[#0a0f1a55] to-transparent" />
+        <EmpireScene className="absolute inset-0 pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#0a0f1acc] via-[#0a0f1a55] to-transparent pointer-events-none" />
         <div className="absolute inset-0 flex flex-col justify-center px-8">
           <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
             <span className="text-[var(--color-accent)]">Empire</span> Dashboard

@@ -34,7 +34,8 @@ export async function GET(req: Request) {
   }
 
   const user = auth.user;
-  const name = user.displayName || user.email.split("@")[0];
+  const reqName = (url.searchParams.get("name") ?? "").trim().slice(0, 64);
+  const name = (reqName && /^[\p{L}\p{N} ._-]+$/u.test(reqName) ? reqName : "") || user.displayName || user.email.split("@")[0];
 
   const at = new AccessToken(lk.apiKey, lk.apiSecret, {
     identity: user.id,

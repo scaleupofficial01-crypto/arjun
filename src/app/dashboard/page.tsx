@@ -4,6 +4,10 @@ import { getCurrentUser } from "@/lib/session";
 import { integrationStatus } from "@/lib/env";
 import { DEMO_MODE, DEMO_USER } from "@/lib/demo";
 import { LogoutButton, LogoutEverywhereButton } from "@/components/logout-buttons";
+import Tilt from "@/components/tilt";
+import nextDynamic from "next/dynamic";
+
+const EmpireScene = nextDynamic(() => import("@/components/empire-scene"), { ssr: false });
 
 export const metadata = { title: "Dashboard — Empire" };
 export const dynamic = "force-dynamic";
@@ -51,25 +55,32 @@ export default async function DashboardPage() {
           the link can see.
         </div>
       )}
-      <header className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">
+
+      {/* ── 3D hero: the 10-level golden staircase rises behind the title ── */}
+      <section className="card relative overflow-hidden p-0 h-52 md:h-60">
+        <EmpireScene className="absolute inset-0" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#0a0f1acc] via-[#0a0f1a55] to-transparent" />
+        <div className="absolute inset-0 flex flex-col justify-center px-8">
+          <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
             <span className="text-[var(--color-accent)]">Empire</span> Dashboard
           </h1>
-          <p className="text-sm text-[var(--color-muted)]">
-            {user.displayName} · {user.email} · role: {user.role.toLowerCase()}
+          <p className="text-sm md:text-base text-[var(--color-muted)] mt-1.5">
+            10 levels. One Empire. — welcome, <span className="text-white font-medium">{user.displayName}</span>
+          </p>
+          <p className="text-xs text-[var(--color-muted)] mt-1">
+            {user.email} · role: {user.role.toLowerCase()}
             {!user.emailVerifiedAt && !isDemo && (
               <span className="badge badge-setup ml-2">email not verified</span>
             )}
           </p>
         </div>
         {!isDemo && (
-          <div className="flex gap-2">
+          <div className="absolute top-4 right-4 flex gap-2">
             <LogoutEverywhereButton />
             <LogoutButton />
           </div>
         )}
-      </header>
+      </section>
 
       <section className="card p-5">
         <h2 className="font-semibold mb-3">Integrations</h2>
@@ -82,34 +93,34 @@ export default async function DashboardPage() {
           <Pill ok={integ.livekit} label="LiveKit / Meet" />
           <Pill ok={integ.mt5} label="MT5 bridge" />
         </div>
-        {integ.realtime.misconfigured && (
-          <p className="mt-3 text-sm text-amber-400">
-            Realtime misconfigured: NEXT_PUBLIC_REALTIME_PROVIDER and
-            REALTIME_PROVIDER must be set together (known bug #6).
+        {!integ.livekit && (
+          <p className="mt-3 text-xs text-[var(--color-muted)]">
+            LiveKit keys add karo to Meet green ho jayega.
           </p>
         )}
         <p className="mt-3 text-xs text-[var(--color-muted)]">
-          Missing pieces stay visibly marked until the required key is added to
-          /credentials/.env — nothing here is faked as working.
+          Missing pieces stay visibly marked until the required key is added to /credentials/.env — nothing here is faked as working.
         </p>
       </section>
 
       <section className="grid md:grid-cols-3 sm:grid-cols-2 gap-4">
         {modules.map((m) =>
           m.ready && m.href ? (
-            <Link key={m.name} href={m.href} className="card p-5 hover:border-[var(--color-accent)] hover:-translate-y-0.5 transition group">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold group-hover:text-[var(--color-accent)] transition">{m.name}</h3>
-                <span className="text-[var(--color-muted)] group-hover:text-[var(--color-accent)] group-hover:translate-x-0.5 transition">→</span>
-              </div>
-              <p className="text-xs text-[var(--color-muted)] mt-2 leading-relaxed">{m.desc}</p>
-              <span className="badge badge-live mt-3">Live — open</span>
-            </Link>
+            <Tilt key={m.name}>
+              <Link href={m.href} className="card block p-5 h-full hover:border-[var(--color-accent)] transition group">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold group-hover:text-[var(--color-accent)] transition">{m.name}</h3>
+                  <span className="text-[var(--color-muted)] group-hover:text-[var(--color-accent)] group-hover:translate-x-0.5 transition">→</span>
+                </div>
+                <p className="text-xs text-[var(--color-muted)] mt-2 leading-relaxed">{m.desc}</p>
+                <span className="badge badge-live mt-3">Live — open</span>
+              </Link>
+            </Tilt>
           ) : (
             <div key={m.name} className="card p-5 opacity-70">
               <h3 className="font-semibold">{m.name}</h3>
               <p className="text-xs text-[var(--color-muted)] mt-2 leading-relaxed">{m.desc}</p>
-              <span className="badge badge-setup mt-3">{m.phase} — coming soon</span>
+              <span className="badge badge-setup mt-3">{m.phase}</span>
             </div>
           ),
         )}

@@ -15,45 +15,81 @@
 }
 
 body {
-  background: var(--color-background);
+  background:
+    radial-gradient(1200px 600px at 85% -10%, #f59e0b12, transparent 60%),
+    radial-gradient(900px 500px at -10% 110%, #3b82f60f, transparent 55%),
+    var(--color-background);
+  background-attachment: fixed;
   color: var(--color-foreground);
   font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: #f59e0b33;
 }
 
 .card {
-  background: var(--color-panel);
+  background: linear-gradient(180deg, #141d2ecc, #0f1623cc);
+  backdrop-filter: blur(8px);
   border: 1px solid var(--color-border);
-  border-radius: 0.75rem;
+  border-radius: 0.875rem;
+  box-shadow: 0 10px 34px #00000055, inset 0 1px 0 #ffffff0a;
+}
+
+/* Pointer-driven 3D tilt (works with the <Tilt/> wrapper) */
+.tilt {
+  transform-style: preserve-3d;
+  perspective: 900px;
+  --rx: 0deg;
+  --ry: 0deg;
+}
+.tilt > * {
+  transform: rotateX(var(--rx)) rotateY(var(--ry));
+  transition: transform 0.25s ease, border-color 0.2s ease, box-shadow 0.25s ease;
+  will-change: transform;
+}
+.tilt:hover > * {
+  box-shadow: 0 18px 46px #00000066, 0 0 0 1px #f59e0b2e, 0 8px 30px #f59e0b14;
+  transition-duration: 0.12s;
 }
 
 .input {
   width: 100%;
   background: var(--color-panel-2);
   border: 1px solid var(--color-border);
-  border-radius: 0.5rem;
+  border-radius: 0.625rem;
   padding: 0.625rem 0.75rem;
   color: var(--color-foreground);
   outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
 }
 .input:focus {
   border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px #f59e0b26;
 }
 
 .btn-primary {
-  background: var(--color-accent);
+  background: linear-gradient(180deg, #fbbf24, #f59e0b);
   color: #0a0f1a;
   font-weight: 600;
-  border-radius: 0.5rem;
+  border-radius: 0.625rem;
   padding: 0.625rem 1rem;
-  transition: opacity 0.15s;
+  box-shadow: 0 6px 18px #f59e0b33, inset 0 1px 0 #ffffff66;
+  transition: filter 0.15s, transform 0.08s, box-shadow 0.15s;
   cursor: pointer;
 }
-.btn-primary:hover {
-  opacity: 0.9;
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.07);
+  box-shadow: 0 8px 24px #f59e0b4d, inset 0 1px 0 #ffffff80;
+}
+.btn-primary:active:not(:disabled) {
+  transform: translateY(1px);
 }
 .btn-primary:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
 .badge {

@@ -48,28 +48,30 @@ export async function POST(req: Request) {
   if (payload.account.currency) accountUpdate.currency = payload.account.currency;
   if (payload.eaVersion !== undefined) accountUpdate.eaVersion = payload.eaVersion;
 
-  await db.$transaction(async (tx) => {
-    await tx.mt5Account.update({ where: { id: account.id }, data: accountUpdate });
-
+  // Array-form transaction: single-connection sequential ops. The interactive
+  // ($transaction(async (tx) => ...)) protocol breaks under serverless +
+  // PgBouncer (P2028: stale transaction id / maxWait exceeded) — this form is
+  // the documented safe pattern there, still atomic, still idempotent.
+  const openTickets = payload.positions.map((p) => p.ticket);
+  const ops = [
+    db.mt5Account.update({ where: { id: account.id }, data: accountUpdate }),
     // Positions: authoritative snapshot — anything no longer reported is closed server-side.
-    const openTickets = payload.positions.map((p) => p.ticket);
-    await tx.mt5Position.deleteMany({
+    db.mt5Position.deleteMany({
       where: { accountId: account.id, ticket: { notIn: openTickets } },
-    });
-    for (const p of payload.positions) {
-      await tx.mt5Position.upsert({
-        where: { accountId_ticket: { accountId: account.id, ticket: p.ticket } },
-        update: { volume: p.volume, openPrice: p.openPrice, openAt: new Date(p.openAt), profit: p.profit ?? null },
+    }),
+    ...payload.positions.map((ppos) =>
+      db.mt5Position.upsert({
+        where: { accountId_ticket: { accountId: account.id, ticket: ppos.ticket } },
+        update: { volume: ppos.volume, openPrice: ppos.openPrice, openAt: new Date(ppos.openAt), profit: ppos.profit ?? null },
         create: {
-          accountId: account.id, ticket: p.ticket, symbol: p.symbol, side: p.side,
-          volume: p.volume, openPrice: p.openPrice, openAt: new Date(p.openAt), profit: p.profit ?? null,
+          accountId: account.id, ticket: ppos.ticket, symbol: ppos.symbol, side: ppos.side,
+          volume: ppos.volume, openPrice: ppos.openPrice, openAt: new Date(ppos.openAt), profit: ppos.profit ?? null,
         },
-      });
-    }
-
+      }),
+    ),
     // Deals: immutable history, upsert by unique ticket per account.
-    for (const d of payload.deals) {
-      await tx.mt5Deal.upsert({
+    ...payload.deals.map((d) =>
+      db.mt5Deal.upsert({
         where: { accountId_ticket: { accountId: account.id, ticket: d.ticket } },
         update: {
           profit: d.profit, commission: d.commission, swap: d.swap,
@@ -81,19 +83,19 @@ export async function POST(req: Request) {
           price: d.price, profit: d.profit, commission: d.commission, swap: d.swap,
           dealtAt: new Date(d.dealtAt),
         },
-      });
-    }
-
+      }),
+    ),
     // v2 EA: latest bid/ask per Market Watch symbol — the terminal's own
     // broker feed, upserted (not history; staleness decided by readers).
-    for (const q of payload.quotes) {
-      await tx.mt5Quote.upsert({
+    ...payload.quotes.map((q) =>
+      db.mt5Quote.upsert({
         where: { accountId_symbol: { accountId: account.id, symbol: q.symbol } },
         update: { bid: q.bid, ask: q.ask, tickAt: q.tickAt ? new Date(q.tickAt) : null },
         create: { accountId: account.id, symbol: q.symbol, bid: q.bid, ask: q.ask, tickAt: q.tickAt ? new Date(q.tickAt) : null },
-      });
-    }
-  }, { maxWait: 10_000, timeout: 20_000 });
+      }),
+    ),
+  ];
+  await db.$transaction(ops);
 
   return json({
     ok: true,

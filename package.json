@@ -12,12 +12,16 @@
     "postinstall": "prisma generate"
   },
   "dependencies": {
+    "@livekit/components-react": "^2.9.24",
+    "@livekit/components-styles": "^1.2.0",
     "@prisma/client": "^6.19.0",
     "@upstash/redis": "^1.39.0",
     "bcryptjs": "^3.0.3",
     "decimal.js": "^10.6.0",
     "jose": "^6.2.12",
     "lightweight-charts": "^5.2.1",
+    "livekit-client": "^2.22.4",
+    "livekit-server-sdk": "^2.19.1",
     "next": "15.5.27",
     "react": "19.1.0",
     "react-dom": "19.1.0",

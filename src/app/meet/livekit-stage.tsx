@@ -18,6 +18,7 @@ export default function LiveKitStage({
   room: string;
   lkConfigured: boolean;
   defaultName: string;
+  onLeave: () => void;
 }) {
   const [sess, setSess] = useState<{ token: string; url: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -95,7 +96,6 @@ export default function LiveKitStage({
           {lkConfigured ? (
             <PreJoin
               joinLabel="Join now"
-              persistUserDefaults={false}
               onSubmit={(choices) => void go(choices.username || defaultName)}
             />
           ) : (

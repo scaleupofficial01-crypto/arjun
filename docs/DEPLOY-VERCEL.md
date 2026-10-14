@@ -1,15 +1,19 @@
 # Deploy Empire to Vercel — real-data runbook (Supabase + auth)
 
-Goal: production at `https://empire-hub.vercel.app` running the same real
+Goal: production at `https://empire-trading-app.vercel.app` running the same real
 Supabase Postgres as the sandbox preview, with real login (AUTH_REQUIRED).
 
-## Why the site 500'd before (postmortem)
+## Postmortem: the 500s
 
-Auto-deploy from `main` picked up the MT5 v2 code, but the production
-Postgres never got `prisma db push`'d — queries referenced columns/tables
-(`eaVersion`, `mt5_quotes`, `mt5_commands`) that didn't exist there. The
-schema now lives on ONE Supabase project shared by preview + production —
-drift can't come back as long as both point at it.
+The HTTP 500s we chased were the **sandbox preview's** local Postgres dying
+(sandbox snapshots clobber live DB files), not the app. Production on Vercel
+had simply never been wired to a real database. Fix: ONE Supabase project
+holds the real schema; sandbox preview + Vercel both point at the same
+pooler — no drift possible.
+
+Domain note: `empire-hub.vercel.app` and `empire-trading.vercel.app` are
+held by another Vercel account → canonical production domain is
+**`empire-trading-app.vercel.app`** (also the EA's default IngestUrl).
 
 ## Supabase (already done from the sandbox)
 
@@ -36,7 +40,7 @@ postgresql://postgres.oqmlctqtwdvyyvvjcrha:<URLENCODED_PASSWORD>@aws-0-ap-southe
 | `AUTH_REQUIRED` | `true` | real login/register screens |
 | `AUTH_SECRET` | copy from `credentials/.env` | session signing — reuse, don't rotate |
 | `CRON_SECRET` | copy from `credentials/.env` | alerts cron auth |
-| `NEXT_PUBLIC_APP_URL` | `https://empire-hub.vercel.app` | shown in EA guide + links |
+| `NEXT_PUBLIC_APP_URL` | `https://empire-trading-app.vercel.app` | shown in EA guide + links |
 | `NEXT_PUBLIC_SUPABASE_URL` | `https://oqmlctqtwdvyyvvjcrha.supabase.co` | optional realtime plumbing |
 | `RESEND_API_KEY`, `EMAIL_FROM` | only when email wanted | app runs fine without (login doesn't require email verification) |
 
@@ -54,6 +58,6 @@ Vercel + GitHub: pushing `main` redeploys. For env-only changes use
 2. `/register` → create YOUR admin user (first one is real, password-based;
    no email needed).
 3. MT5 Sync → Add account → paste EA inputs into `empire_bridge.mq5` v2 in
-   your terminal (origin allowlist = `https://empire-hub.vercel.app`).
+   your terminal (origin allowlist = `https://empire-trading-app.vercel.app`).
 4. First sync lands within the EA's timer cycle; SELL/BUY unlock after the
    page shows the v2 badge.

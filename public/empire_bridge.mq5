@@ -26,7 +26,7 @@
 //|     once, and the Ingest URL shown next to it.                   |
 //|  2. MetaTrader 5 → Tools → Options → Expert Advisors → tick      |
 //|     "Allow WebRequest for listed URL" and add your app origin    |
-//|     (e.g. https://empire-hub.vercel.app).                        |
+//|     (e.g. https://empire-trading-app.vercel.app).                        |
 //|  3. Drag this EA onto any chart, fill IngestUrl + IngestToken,   |
 //|     keep Algo Trading ON (v2 needs it to execute your clicks).   |
 //|     First sync within a minute.                                  |
@@ -38,7 +38,7 @@
 #define EA_VERSION   "2.00"
 #define EMPIRE_MAGIC 20261014
 
-input string IngestUrl     = "https://empire-hub.vercel.app/api/mt5/ingest"; // Empire ingest URL
+input string IngestUrl     = "https://empire-trading-app.vercel.app/api/mt5/ingest"; // Empire ingest URL
 input string IngestToken   = "";        // mt5_... token from the app (shown once)
 input int    TimerSeconds  = 10;        // sync + command-poll interval (min 2)
 input int    HistoryDays   = 30;        // closed-deals lookback

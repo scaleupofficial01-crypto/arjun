@@ -7,6 +7,27 @@ only — no fabricated numbers, no fake statuses.
 > live charts with persistent drawings, analytics, alerts, MT5 sync, messenger,
 > Empire Meet video meetings and community.
 
+## 🌐 Production (live)
+
+- **URL:** https://empire-trading-app.vercel.app — Vercel, **auto-deploys on every push to `main`**
+  (commit author must be a Vercel seat member, else the build is seat-blocked).
+- **Database:** Supabase Postgres `oqmlctqtqtwdvyyvvjcrha` via the **ap-southeast-1 pooler** —
+  ONE shared real DB for production and the sandbox preview (no drift possible).
+- **Auth:** `AUTH_REQUIRED=true` in production — real accounts only, demo mode off.
+- **Cron:** `/api/cron/alerts` daily 08:00 UTC (CRON_SECRET-guarded, declared in `vercel.json`).
+
+### Go-live checklist — real MT5 terminal
+
+1. Register at the URL above (your real email → your workspace).
+2. **MT5 Sync → Add account** → paste your MT5 credentials → copy the `mt5_…` ingest token (shown once).
+3. **Download `empire_bridge.mq5`** → `MQL5/Experts` → MetaEditor → **F7** compile.
+4. MT5: Tools → Options → Expert Advisors → **Allow WebRequest** for `https://empire-trading-app.vercel.app`.
+5. Drag the EA onto any chart → IngestToken = the `mt5_…` token (IngestUrl already defaults to the
+   production URL) → **Algo Trading ON** → first sync <1 minute → account goes live and v2 SELL/BUY unlocks
+   (trades execute only inside YOUR terminal — server stores no MT5 passwords, ever).
+
+Full runbook: `docs/DEPLOY-VERCEL.md`.
+
 ## Stack
 - **Next.js 15** (App Router) + **TypeScript** + **Tailwind CSS**
 - **Postgres** via Supabase (Prisma ORM; pooled URL with `connection_limit=10`

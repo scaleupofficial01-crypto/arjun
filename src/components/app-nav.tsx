@@ -11,6 +11,10 @@ const links = [
   ["/analytics", "Analytics"],
   ["/watchlists", "Watchlists"],
   ["/mt5", "MT5"],
+  ["/meet", "Meet"],
+  ["/messages", "Messages"],
+  ["/community", "Community"],
+  ["/admin", "Admin"],
 ] as const;
 
 export default async function AppNav({ active }: { active: string }) {

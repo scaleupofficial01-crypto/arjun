@@ -17,10 +17,10 @@ const modules = [
   { name: "Analytics", href: "/analytics", phase: null, ready: true, desc: "Win rate, expectancy, profit factor, max drawdown vs true peak, equity curve." },
   { name: "Watchlists & Alerts", href: "/watchlists", phase: null, ready: true, desc: "Real prices only (Coinbase live / ECB forex). Alerts fire on real crosses." },
   { name: "MT5 Sync", href: "/mt5", phase: null, ready: true, desc: "Read-only EA bridge — terminal pushes deals/positions with a scoped token. No passwords stored, ever." },
-  { name: "Messenger", href: null, phase: "In development", ready: false, desc: "Pro DM chat: groups, reactions, read receipts, chart sharing." },
+  { name: "Messenger", href: "/messages", phase: null, ready: true, desc: "1:1 DMs & group chats with read tracking. Members-only threads — nothing public ever." },
   { name: "Empire Meet", href: "/meet", phase: null, ready: true, desc: "In-app video meetings with screen share — logged-in access only. No external links." },
-  { name: "Community", href: null, phase: "In development", ready: false, desc: "Trader profiles, follows, analysis posts with server-side visibility rules." },
-  { name: "Admin", href: null, phase: "In development", ready: false, desc: "Moderation, feature flags, integration health — server-side role gates." },
+  { name: "Community", href: "/community", phase: null, ready: true, desc: "Trader profiles & follows; notes + analysis posts with server-enforced PUBLIC/FOLLOWERS visibility." },
+  { name: "Admin", href: "/admin", phase: null, ready: true, desc: "Platform stats, user role management (promote/demote), integration health — server-enforced ADMIN gate." },
 ];
 
 export default async function DashboardPage() {

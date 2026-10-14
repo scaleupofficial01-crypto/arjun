@@ -327,11 +327,6 @@ export default function TradeMap({ deals, accountId, positions }: { deals: MapDe
     posLinesRef.current = [];
     posMarkersApiRef.current = anchorSerRef.current ? createSeriesMarkers(anchorSerRef.current, []) : null;
 
-    // dev-only probe: ?tmdebug exposes series internals for Playwright/e2e
-    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).has("tmdebug")) {
-      (window as unknown as { __tm?: unknown }).__tm = { chart, anchor: anchorSerRef.current };
-    }
-
     // ----- drawing tools: click-chart interactions -----
     const resolveAnchor = (x: number, y: number): Anchor | null => {
       const price = anchorSerRef.current?.coordinateToPrice(y);
@@ -485,15 +480,6 @@ export default function TradeMap({ deals, accountId, positions }: { deals: MapDe
     markers.sort((a, b) => Number(a.time) - Number(b.time));
     posMarkersApiRef.current?.setMarkers(markers);
 
-    // dev-only probe (?tmdebug): report what the overlay effect actually did
-    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).has("tmdebug")) {
-      (window as unknown as { __tmPos?: unknown }).__tmPos = {
-        mine: mine.length,
-        lines: posLinesRef.current.length,
-        markers: markers.length,
-        firstLineOpts: posLinesRef.current[0] ? posLinesRef.current[0].options() : null,
-      };
-    }
   }, [positionsKey, current, candles]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ----- (re)render drawing series whenever drawings or the chart change -----

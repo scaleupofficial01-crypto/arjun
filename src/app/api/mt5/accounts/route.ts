@@ -16,7 +16,7 @@ export async function GET(req: Request) {
     orderBy: { createdAt: "desc" },
     select: {
       id: true, label: true, login: true, server: true, currency: true,
-      balance: true, equity: true, lastSyncAt: true, createdAt: true,
+      balance: true, equity: true, lastSyncAt: true, eaVersion: true, createdAt: true,
       _count: { select: { positions: true, deals: true } },
     },
   });
@@ -67,7 +67,7 @@ export async function POST(req: Request) {
     data: { userId: auth.user.id, label, login, server, currency, ingestTokenHash: hash },
     select: {
       id: true, label: true, login: true, server: true, currency: true,
-      balance: true, equity: true, lastSyncAt: true, createdAt: true,
+      balance: true, equity: true, lastSyncAt: true, eaVersion: true, createdAt: true,
     },
   });
   return json(

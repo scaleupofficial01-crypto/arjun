@@ -276,13 +276,57 @@ model Mt5Account {
   balance         Decimal? @db.Decimal(20, 2)
   equity          Decimal? @db.Decimal(20, 2)
   lastSyncAt      DateTime?
+  // EA self-reports its version on ingest (e.g. "2.00"). Trading from the
+  // app only unlocks for EA >= 2.00 — v1 cannot receive trade commands.
+  eaVersion       String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   positions       Mt5Position[]
   deals           Mt5Deal[]
+  quotes          Mt5Quote[]
+  commands        Mt5Command[]
 
   @@index([userId])
   @@map("mt5_accounts")
+}
+
+/// Latest bid/ask per symbol, pushed by the terminal EA — the terminal's
+/// OWN broker feed, not a third-party approximation.
+model Mt5Quote {
+  id        String     @id @default(cuid())
+  accountId String
+  account   Mt5Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  symbol    String
+  bid       Decimal    @db.Decimal(20, 8)
+  ask       Decimal    @db.Decimal(20, 8)
+  tickAt    DateTime? // tick time as reported by the terminal
+  updatedAt DateTime   @updatedAt
+
+  @@unique([accountId, symbol])
+  @@map("mt5_quotes")
+}
+
+/// App-initiated trade orders, executed by the terminal-side EA.
+/// The server holds NO MT5 credentials — it can only queue an intent; the
+/// EA (which already lives inside the user's terminal) is what executes it.
+/// Lifecycle: QUEUED -> (EA claims) TAKEN -> DONE | FAILED (with reason).
+model Mt5Command {
+  id        String     @id @default(cuid())
+  accountId String
+  account   Mt5Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  userId    String // who queued it (audit trail)
+  symbol    String
+  side      TradeSide
+  volume    Decimal    @db.Decimal(20, 8)
+  status    String     @default("QUEUED") // QUEUED | TAKEN | DONE | FAILED
+  ticket    String? // resulting deal ticket on success
+  error     String? // broker retcode/reason on failure — never hidden
+  createdAt DateTime   @default(now())
+  takenAt   DateTime?
+  doneAt    DateTime?
+
+  @@index([accountId, status, createdAt])
+  @@map("mt5_commands")
 }
 
 model Mt5Position {

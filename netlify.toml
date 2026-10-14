@@ -1,0 +1,13 @@
+[build]
+  command = "npm ci && npx prisma generate && npm run build"
+  publish = ".next"
+
+# Netlify's Next.js runtime — serves App Router routes, SSR and API
+# handlers (/api/*) as Netlify Functions. Auto-detected by Netlify when
+# deploying through the CLI/UI; declared explicitly for reproducibility.
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+[functions]
+  # Ingest payloads (30d deal history) + EA polls can run long-ish
+  node_bundler = "esbuild"

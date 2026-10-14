@@ -7,8 +7,12 @@ import {
   CandlestickSeries,
   createSeriesMarkers,
   ColorType,
+  LineStyle,
   type IChartApi,
+  type IPriceLine,
   type ISeriesApi,
+  type ISeriesMarkersPluginApi,
+  type Time,
   type UTCTimestamp,
 } from "lightweight-charts";
 import { buildTradeMap, type MapDeal, type SymbolMap } from "@/lib/trade-map";
@@ -25,6 +29,17 @@ import {
 type Tool = "cursor" | DrawingType;
 type SaveState = "idle" | "loading" | "saving" | "saved" | "error";
 type Candle = { time: number; open: number; high: number; low: number; close: number };
+
+/** Open position as synced by the terminal EA (floating P&L included). */
+export interface MapPosition {
+  ticket: string;
+  symbol: string;
+  side: "BUY" | "SELL";
+  volume: string;
+  openPrice: string;
+  openAt: string;
+  profit: string | null;
+}
 
 const TOOLS: { id: Tool; label: string; hint: string }[] = [
   { id: "cursor", label: "⬙", hint: "cursor" },
@@ -44,8 +59,26 @@ const TWO_CLICK_TOOLS = new Set<Tool>(["trendline", "ray", "rect"]);
  * PERSIST server-side per account+symbol (/api/charts/layout), along with
  * the visible zoom/pan range, exactly like TradingView's saved layouts.
  */
-export default function TradeMap({ deals, accountId }: { deals: MapDeal[]; accountId?: string }) {
-  const maps = useMemo(() => buildTradeMap(deals), [deals]);
+export default function TradeMap({ deals, accountId, positions }: { deals: MapDeal[]; accountId?: string; positions?: MapPosition[] }) {
+  // The parent polls every 5s and hands us a NEW deals array each time —
+  // key on the SEMANTIC content so `maps`/`current` keep stable identity and
+  // the chart isn't needlessly torn down + rebuilt (which would wipe open
+  // position price lines drawn by the overlay effect).
+  const mapsKey = JSON.stringify([
+    deals.map((d) => [d.ticket, d.entry, d.profit, d.price, d.imported ? 1 : 0]),
+    (positions ?? []).map((p) => [p.ticket, p.symbol, p.side]),
+  ]);
+  const maps = useMemo(() => {
+    const fromDeals = buildTradeMap(deals);
+    if (fromDeals.length > 0) return fromDeals;
+    // No closed deals yet but an open position exists: still show a chart
+    // (candles + open-position overlays) instead of an empty placeholder.
+    const p = positions?.[0];
+    return p
+      ? [{ symbol: p.symbol, points: [], segments: [], markers: [] } as SymbolMap]
+      : [];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapsKey]);
   const [symbol, setSymbol] = useState<string | null>(null);
   const [candles, setCandles] = useState<Candle[]>([]);
   const [candleSrc, setCandleSrc] = useState<{ label: string | null; proxyNote: string | null }>({ label: null, proxyNote: null });
@@ -60,6 +93,9 @@ export default function TradeMap({ deals, accountId }: { deals: MapDeal[]; accou
   const anchorSerRef = useRef<ISeriesApi<"Candlestick"> | ISeriesApi<"Line"> | null>(null);
   const drawingSerRef = useRef<Map<string, ISeriesApi<"Line">[]>>(new Map());
   const candleRef = useRef<Candle[]>([]);
+  // open-position overlay (MT5-mobile style): entry lines + arrows
+  const posLinesRef = useRef<IPriceLine[]>([]);
+  const posMarkersApiRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
 
   // live refs so chart event closures always see the latest UI state
   const toolRef = useRef<Tool>(tool);
@@ -287,6 +323,15 @@ export default function TradeMap({ deals, accountId }: { deals: MapDeal[]; accou
       })),
     );
 
+    // open-position arrows attach to the price-anchored series (separate plugin)
+    posLinesRef.current = [];
+    posMarkersApiRef.current = anchorSerRef.current ? createSeriesMarkers(anchorSerRef.current, []) : null;
+
+    // dev-only probe: ?tmdebug exposes series internals for Playwright/e2e
+    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).has("tmdebug")) {
+      (window as unknown as { __tm?: unknown }).__tm = { chart, anchor: anchorSerRef.current };
+    }
+
     // ----- drawing tools: click-chart interactions -----
     const resolveAnchor = (x: number, y: number): Anchor | null => {
       const price = anchorSerRef.current?.coordinateToPrice(y);
@@ -367,8 +412,89 @@ export default function TradeMap({ deals, accountId }: { deals: MapDeal[]; accou
       chartRef.current = null;
       anchorSerRef.current = null;
       drawingSerRef.current.clear();
+      posLinesRef.current = [];
+      posMarkersApiRef.current = null;
     };
   }, [current, candles]);
+
+  // ----- open-position overlay: entry arrows + dashed entry lines (MT5 style) -----
+  // Runs outside the chart-build effect so 5s position polling updates the
+  // floating P&L labels WITHOUT rebuilding the whole chart.
+  const positionsKey = JSON.stringify(
+    (positions ?? []).filter((p) => p.symbol === current?.symbol)
+      .map((p) => [p.ticket, p.side, p.volume, p.openPrice, p.openAt, p.profit]),
+  );
+  useEffect(() => {
+    const anchor = anchorSerRef.current;
+    if (!anchor) return;
+    for (const pl of posLinesRef.current) { try { anchor.removePriceLine(pl); } catch { /* gone */ } }
+    posLinesRef.current = [];
+    posMarkersApiRef.current?.setMarkers([]);
+
+    const mine = (positions ?? []).filter((p) => p.symbol === current?.symbol);
+    if (mine.length === 0 || !current) return;
+
+    const bars = candleRef.current;
+    /** bar whose open covers t; markers outside loaded data are skipped honestly */
+    const barOf = (t: number): number | null => {
+      let hit: number | null = null;
+      for (const b of bars) { if (b.time <= t) hit = b.time; else break; }
+      return hit;
+    };
+
+    const markers: {
+      time: UTCTimestamp;
+      position: "belowBar" | "aboveBar";
+      shape: "arrowUp" | "arrowDown";
+      color: string;
+      text: string;
+      size: 1;
+    }[] = [];
+
+    for (const p of mine) {
+      const isBuy = p.side === "BUY";
+      const color = isBuy ? "#2196f3" : "#f23645";
+      const open = Number(p.openPrice);
+      if (!Number.isFinite(open) || open <= 0) continue;
+      const pnl = p.profit === null ? "" : ` · ${Number(p.profit) >= 0 ? "+" : ""}${Number(p.profit).toFixed(2)}`;
+      try {
+        posLinesRef.current.push(
+          anchor.createPriceLine({
+            price: open,
+            color,
+            lineWidth: 1,
+            lineStyle: LineStyle.Dashed,
+            axisLabelVisible: true,
+            title: `${p.side} ${Number(p.volume).toFixed(2)}${pnl}`,
+          }),
+        );
+      } catch { /* scale not ready — line skipped, retried on next render */ }
+
+      const t = barOf(Math.floor(new Date(p.openAt).getTime() / 1000));
+      if (t !== null) {
+        markers.push({
+          time: t as UTCTimestamp,
+          position: isBuy ? "belowBar" : "aboveBar",
+          shape: isBuy ? "arrowUp" : "arrowDown",
+          color,
+          text: `${p.side} ${Number(p.volume).toFixed(2)}`,
+          size: 1,
+        });
+      }
+    }
+    markers.sort((a, b) => Number(a.time) - Number(b.time));
+    posMarkersApiRef.current?.setMarkers(markers);
+
+    // dev-only probe (?tmdebug): report what the overlay effect actually did
+    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).has("tmdebug")) {
+      (window as unknown as { __tmPos?: unknown }).__tmPos = {
+        mine: mine.length,
+        lines: posLinesRef.current.length,
+        markers: markers.length,
+        firstLineOpts: posLinesRef.current[0] ? posLinesRef.current[0].options() : null,
+      };
+    }
+  }, [positionsKey, current, candles]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ----- (re)render drawing series whenever drawings or the chart change -----
   useEffect(() => {
@@ -498,6 +624,7 @@ export default function TradeMap({ deals, accountId }: { deals: MapDeal[]; accou
       </div>
       <p className="text-[11px] text-[var(--color-muted)]">
         ▲ entry (side + volume) · ▼ exit (result) · green/red connector = profitable/losing round-trip.
+        Dashed blue/red line + arrow = <b>open position</b> (floating P&L, straight from your terminal).
         Drawings and your zoom level are saved to your account automatically (TradingView-style).
         {candleSrc.label
           ? <> Candles: {candleSrc.label}{candleSrc.proxyNote ? ` (${candleSrc.proxyNote})` : ""}.</>

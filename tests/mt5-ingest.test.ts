@@ -5,6 +5,8 @@ import {
   parseIngestPayload,
   pairDealsToTrades,
   toIsoDate,
+  parseTradeRequest,
+  eaSupportsTrading,
 } from "@/lib/mt5";
 
 describe("ingest tokens", () => {
@@ -84,5 +86,70 @@ describe("toIsoDate", () => {
     expect(toIsoDate("2026-10-01T00:00:00.000Z")).toBe("2026-10-01T00:00:00.000Z");
     expect(toIsoDate("nope")).toBeNull();
     expect(toIsoDate(123)).toBeNull();
+  });
+});
+
+describe("v2 quotes + eaVersion", () => {
+  const base = {
+    account: { login: "5100123" },
+    positions: [],
+    deals: [],
+  };
+
+  it("parses quotes and stays backward-compatible without them", () => {
+    const old = parseIngestPayload(base); // v1 EA payload — no quotes field at all
+    expect(old.quotes).toEqual([]);
+    expect(old.eaVersion).toBeUndefined();
+
+    const v2 = parseIngestPayload({
+      ...base,
+      quotes: [{ symbol: "XAUUSD", bid: 4100.95, ask: 4101.45, tickAt: 1760592000 }],
+      eaVersion: "2.00",
+    });
+    expect(v2.quotes).toHaveLength(1);
+    expect(v2.quotes[0].bid).toBe(4100.95);
+    expect(v2.quotes[0].tickAt).toBe(new Date(1760592000 * 1000).toISOString());
+    expect(v2.eaVersion).toBe("2.00");
+  });
+
+  it("rejects junk quotes/version honestly", () => {
+    expect(() => parseIngestPayload({ ...base, quotes: [{ symbol: "XAUUSD", bid: -1, ask: 2 }] })).toThrow(/bid\/ask/);
+    expect(() => parseIngestPayload({ ...base, quotes: [{ bid: 1, ask: 2 }] })).toThrow(/symbol required/);
+    expect(() => parseIngestPayload({ ...base, quotes: [{ symbol: "XAUUSD", bid: 1, ask: 2, tickAt: "not a date" }] })).toThrow(/tickAt/);
+    expect(() => parseIngestPayload({ ...base, eaVersion: "beta" })).toThrow(/eaVersion/);
+  });
+});
+
+describe("app-side trade requests + EA gating", () => {
+  it("accepts a sane market-position request", () => {
+    const t = parseTradeRequest({ symbol: "XAUUSD", side: "BUY", volume: 0.01 });
+    expect(t).toEqual({ symbol: "XAUUSD", side: "BUY", volume: 0.01 });
+    // string volumes and exotic-but-real broker symbols work too
+    expect(parseTradeRequest({ symbol: "XAUUSD.i", side: "SELL", volume: "2" }).volume).toBe(2);
+  });
+
+  it("rejects junk honestly", () => {
+    expect(() => parseTradeRequest(null)).toThrow(/object/);
+    expect(() => parseTradeRequest({ symbol: "", side: "BUY", volume: 1 })).toThrow(/symbol/);
+    expect(() => parseTradeRequest({ symbol: "XAUUSD", side: "LONG", volume: 1 })).toThrow(/side/);
+    expect(() => parseTradeRequest({ symbol: "XAUUSD", side: "BUY", volume: 0 })).toThrow(/volume/);
+    expect(() => parseTradeRequest({ symbol: "XAUUSD", side: "BUY", volume: 999 })).toThrow(/volume/);
+    expect(() => parseTradeRequest({ symbol: "XAUUSD", side: "BUY", volume: 0.1234567 })).toThrow(/decimals/);
+    expect(() => parseTradeRequest({ symbol: "DROP TABLE X", side: "BUY", volume: 1 })).toThrow(/symbol/);
+  });
+
+  it("0.01-style volumes survive IEEE754 (0.01*1e6 !== 10000 exactly)", () => {
+    expect(() => parseTradeRequest({ symbol: "EURUSD", side: "BUY", volume: 0.01 })).not.toThrow();
+    expect(() => parseTradeRequest({ symbol: "EURUSD", side: "BUY", volume: 0.29 })).not.toThrow();
+  });
+
+  it("gates trading on EA version honestly (v1 read-only cannot execute)", () => {
+    expect(eaSupportsTrading(null)).toBe(false);
+    expect(eaSupportsTrading(undefined)).toBe(false);
+    expect(eaSupportsTrading("1.00")).toBe(false);
+    expect(eaSupportsTrading("1.99")).toBe(false);
+    expect(eaSupportsTrading("2.00")).toBe(true);
+    expect(eaSupportsTrading("2.15")).toBe(true);
+    expect(eaSupportsTrading("garbage")).toBe(false);
   });
 });

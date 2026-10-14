@@ -16,7 +16,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     where: { id, userId: auth.user.id },
     select: {
       id: true, label: true, login: true, server: true, currency: true,
-      balance: true, equity: true, lastSyncAt: true, createdAt: true,
+      balance: true, equity: true, lastSyncAt: true, eaVersion: true, createdAt: true,
     },
   });
   if (!account) return notFound();

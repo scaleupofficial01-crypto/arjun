@@ -1,13 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import TradeMap from "./trade-map";
+import { useCallback, useEffect, useRef, useState } from "react";
+import TradeMap, { type MapPosition } from "./trade-map";
 import EquityChart from "./equity-chart";
+import TradePanel from "./trade-panel";
 import { buildRoundTrips } from "@/lib/trade-map";
 
 interface Account {
   id: string; label: string; login: string; server: string; currency: string;
   balance: string | null; equity: string | null; lastSyncAt: string | null; createdAt: string;
+  eaVersion?: string | null;
   positions?: number; deals?: number;
 }
 interface Position { ticket: string; symbol: string; side: string; volume: string; openPrice: string; openAt: string; profit: string | null; }
@@ -36,7 +38,7 @@ function ConnectGuide({ ingestUrl, appUrl }: { ingestUrl: string; appUrl: string
       </button>
       {open && (
         <ol className="text-xs text-[var(--color-muted)] list-decimal ml-5 space-y-1.5">
-          <li>MT5 open karo (demo ya real — dono chalenge; bridge read-only hai, trade place karna <b>impossible</b> hai).</li>
+          <li>MT5 open karo (demo ya real — dono chalenge). v1 bridge read-only tha; <b>v2 EA app ke SELL/BUY clicks ko sirf isi terminal ke andar market order</b> banata hai — password yaha bhi nahi aata, token rotate = sab revoke.</li>
           <li>Tools → Options → <b>Expert Advisors</b> → tick <i>“Allow WebRequest for listed URL”</i> → add exactly:
             <div className="flex items-center gap-2 mt-1">
               <code className="px-2 py-0.5 rounded bg-black/40 text-[var(--color-accent)] select-all">{origin}</code>
@@ -65,19 +67,36 @@ export default function Mt5App({ appUrl }: { appUrl: string }) {
   const [detail, setDetail] = useState<{ account: Account; positions: Position[]; deals: Deal[] } | null>(null);
   const [importFor, setImportFor] = useState<string | null>(null);
 
+  // First poll that sees a synced account opens its detail ONCE — re-polling
+  // must never hijack the user after they've closed the panel.
+  const autoOpenedRef = useRef(false);
   const load = useCallback(async () => {
     const r = await call<{ accounts: Account[] }>("/api/mt5/accounts");
     if (r.ok && r.data) {
       setAccounts(r.data.accounts);
-      // UX: auto-open the most recently synced account's details so users
-      // land straight on live positions/deals + trade map.
       const synced = r.data.accounts.find((a) => a.lastSyncAt);
-      if (synced) void openDetail(synced.id);
+      if (synced && !autoOpenedRef.current) {
+        autoOpenedRef.current = true;
+        void openDetail(synced.id);
+      }
     }
     const j = await call<{ journals: Journal[] }>("/api/journals");
     if (j.ok && j.data) setJournals(j.data.journals);
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { void load(); }, [load]);
+
+  // Live feel: refresh account list every 20s (sync badges), and the open
+  // account's positions/deals every 5s (floating P&L, new/closed trades).
+  useEffect(() => {
+    const t = setInterval(() => { void load(); }, 20000);
+    return () => clearInterval(t);
+  }, [load]);
+  useEffect(() => {
+    if (!detail) return;
+    const id = detail.account.id;
+    const t = setInterval(() => { void openDetail(id); }, 5000);
+    return () => clearInterval(t);
+  }, [detail?.account?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const ingestUrl = `${appUrl || (typeof window !== "undefined" ? window.location.origin : "")}/api/mt5/ingest`;
 
@@ -131,13 +150,15 @@ export default function Mt5App({ appUrl }: { appUrl: string }) {
     <div className="max-w-6xl mx-auto px-6 py-8 space-y-5">
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-xl font-bold">MT5 Sync</h1>
-        <span className="badge badge-live">read-only bridge</span>
+        <span className="badge badge-live">terminal bridge</span>
+        <span className="badge badge-live">v2: click-to-trade via your EA</span>
         <span className="badge badge-demo">no passwords stored — ever</span>
       </div>
 
       <div className="card p-4 text-xs text-[var(--color-muted)] space-y-1">
-        <p><b className="text-white">How it works:</b> Your MT5 login/password never leaves your PC. A tiny EA (<a className="text-[var(--color-accent)] underline" href="/empire_bridge.mq5" download>empire_bridge.mq5</a>) running in your terminal reads account data and pushes it here with a scoped per-account token.</p>
-        <p><b className="text-white">Honest status:</b> until an EA actually connects, every account shows “waiting for first sync” — nothing here is simulated.</p>
+        <p><b className="text-white">How it works:</b> Your MT5 login/password never leaves your PC. A tiny EA (<a className="text-[var(--color-accent)] underline" href="/empire_bridge.mq5" download>empire_bridge.mq5</a>) running in your terminal pushes account data, live quotes and positions here with a scoped per-account token.</p>
+        <p><b className="text-white">Trading (v2):</b> SELL/BUY yahan click karo → server sirf intent queue karta hai → aapka apna terminal usse <b>market order ke roop me execute</b> karta hai aur broker ka seedha verdict (fill ticket ya rejection reason) wapas dikhata hai. Server ke paas credentials hai hi nahi — wo khud kuch execute nahi kar sakta.</p>
+        <p><b className="text-white">Honest status:</b> until an EA actually connects, every account shows “waiting for first sync” — nothing here is simulated, not even prices.</p>
       </div>
 
       <ConnectGuide ingestUrl={ingestUrl} appUrl={appUrl} />
@@ -236,8 +257,26 @@ export default function Mt5App({ appUrl }: { appUrl: string }) {
               </tbody>
             </table>
           </div>
-          <h3 className="text-sm font-medium text-[var(--color-accent)]">Chart — your trades on real market candles</h3>
-          <TradeMap accountId={detail.account.id} deals={detail.deals.map((d) => ({ ...d, dealtAt: String(d.dealtAt) }))} />
+          <h3 className="text-sm font-medium text-[var(--color-accent)]">Quick trade — terminal ke andar market order (EA v2)</h3>
+          <TradePanel
+            accounts={[{
+              id: detail.account.id,
+              label: detail.account.label,
+              login: detail.account.login,
+              server: detail.account.server,
+              eaVersion: detail.account.eaVersion,
+              lastSyncAt: detail.account.lastSyncAt,
+            }]}
+            initialSymbol={detail.positions[0]?.symbol ?? detail.deals[0]?.symbol ?? "XAUUSD"}
+            onTraded={() => void openDetail(detail.account.id)}
+          />
+
+          <h3 className="text-sm font-medium text-[var(--color-accent)]">Chart — open positions + your trades on real market candles</h3>
+          <TradeMap
+            accountId={detail.account.id}
+            deals={detail.deals.map((d) => ({ ...d, dealtAt: String(d.dealtAt) }))}
+            positions={detail.positions.map((p) => ({ ...p, side: p.side as MapPosition["side"] }))}
+          />
 
           {(() => {
             const deals = detail.deals.map((d) => ({ ...d, dealtAt: String(d.dealtAt) }));

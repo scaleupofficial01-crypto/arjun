@@ -46,6 +46,7 @@ export async function POST(req: Request) {
   if (payload.account.balance !== undefined) accountUpdate.balance = payload.account.balance;
   if (payload.account.equity !== undefined) accountUpdate.equity = payload.account.equity;
   if (payload.account.currency) accountUpdate.currency = payload.account.currency;
+  if (payload.eaVersion !== undefined) accountUpdate.eaVersion = payload.eaVersion;
 
   await db.$transaction(async (tx) => {
     await tx.mt5Account.update({ where: { id: account.id }, data: accountUpdate });
@@ -82,6 +83,16 @@ export async function POST(req: Request) {
         },
       });
     }
+
+    // v2 EA: latest bid/ask per Market Watch symbol — the terminal's own
+    // broker feed, upserted (not history; staleness decided by readers).
+    for (const q of payload.quotes) {
+      await tx.mt5Quote.upsert({
+        where: { accountId_symbol: { accountId: account.id, symbol: q.symbol } },
+        update: { bid: q.bid, ask: q.ask, tickAt: q.tickAt ? new Date(q.tickAt) : null },
+        create: { accountId: account.id, symbol: q.symbol, bid: q.bid, ask: q.ask, tickAt: q.tickAt ? new Date(q.tickAt) : null },
+      });
+    }
   }, { maxWait: 10_000, timeout: 20_000 });
 
   return json({
@@ -90,5 +101,6 @@ export async function POST(req: Request) {
     syncedAt: new Date().toISOString(),
     openPositions: payload.positions.length,
     dealsUpserted: payload.deals.length,
+    quotesUpserted: payload.quotes.length,
   });
 }

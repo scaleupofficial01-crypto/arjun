@@ -51,14 +51,27 @@ export interface IngestDeal {
   dealtAt: string;
 }
 
+export interface IngestQuote {
+  symbol: string;
+  bid: number;
+  ask: number;
+  /** tick time — optional; server falls back to receipt time */
+  tickAt?: string;
+}
+
 export interface IngestPayload {
   account: IngestAccount;
   positions: IngestPosition[];
   deals: IngestDeal[];
+  /** v2 EA: live bid/ask for Market Watch symbols (the terminal's own feed) */
+  quotes: IngestQuote[];
+  /** v2 EA self-reports its version, e.g. "2.00" — gates app-side trading */
+  eaVersion?: string;
 }
 
 const MAX_POSITIONS = 500;
 const MAX_DEALS = 2000;
+const MAX_QUOTES = 40;
 
 function str(v: unknown, max = 64): string | null {
   return typeof v === "string" && v.trim().length > 0 && v.length <= max ? v.trim() : null;
@@ -105,8 +118,10 @@ export function parseIngestPayload(body: unknown): IngestPayload {
 
   const posIn = Array.isArray(b.positions) ? b.positions : [];
   const dealIn = Array.isArray(b.deals) ? b.deals : [];
+  const quoteIn = Array.isArray(b.quotes) ? b.quotes : [];
   if (posIn.length > MAX_POSITIONS) throw new Error(`positions capped at ${MAX_POSITIONS}`);
   if (dealIn.length > MAX_DEALS) throw new Error(`deals capped at ${MAX_DEALS}`);
+  if (quoteIn.length > MAX_QUOTES) throw new Error(`quotes capped at ${MAX_QUOTES}`);
 
   const positions = posIn.map((p, i): IngestPosition => {
     const o = p as Record<string, unknown>;
@@ -147,7 +162,68 @@ export function parseIngestPayload(body: unknown): IngestPayload {
     return { ticket, positionId, symbol, side: o.side, entry: o.entry, volume, price, profit, commission, swap, dealtAt };
   });
 
-  return { account, positions, deals };
+  const quotes = quoteIn.map((q, i): IngestQuote => {
+    const o = q as Record<string, unknown>;
+    const symbol = str(o.symbol, 20);
+    const bid = num(o.bid);
+    const ask = num(o.ask);
+    if (!symbol) throw new Error(`quotes[${i}]: symbol required`);
+    if (bid === null || bid <= 0 || ask === null || ask <= 0)
+      throw new Error(`quotes[${i}]: bid/ask must be > 0`);
+    const tickAt = o.tickAt === undefined ? undefined : toIsoDate(o.tickAt);
+    if (o.tickAt !== undefined && !tickAt) throw new Error(`quotes[${i}]: tickAt unparseable`);
+    return { symbol, bid, ask, tickAt: tickAt ?? undefined };
+  });
+
+  let eaVersion: string | undefined;
+  if (b.eaVersion !== undefined) {
+    const v = str(b.eaVersion, 10);
+    if (!v || !/^\d+\.\d+$/.test(v)) throw new Error("eaVersion must look like \"2.00\"");
+    eaVersion = v;
+  }
+
+  return { account, positions, deals, quotes, eaVersion };
+}
+
+/* ------------------------------------------------------------------ */
+/* App-initiated trading (server queues intents; the terminal EA runs  */
+/* them — the server itself never holds MT5 credentials).              */
+/* ------------------------------------------------------------------ */
+
+export interface TradeRequest {
+  symbol: string;
+  side: "BUY" | "SELL";
+  volume: number;
+}
+
+const SYMBOL_RE = /^[A-Za-z0-9._#\-+]{1,20}$/;
+/** Loose bounds — per-broker min/max/step are enforced by the EA at the terminal. */
+export const TRADE_VOLUME_MIN = 0.0001;
+export const TRADE_VOLUME_MAX = 500;
+
+/** Strict, honest validation of an app-side "open market position" click. */
+export function parseTradeRequest(body: unknown): TradeRequest {
+  if (!body || typeof body !== "object") throw new Error("JSON object body required");
+  const b = body as Record<string, unknown>;
+  const symbol = str(b.symbol, 20);
+  if (!symbol || !SYMBOL_RE.test(symbol)) throw new Error("symbol: 1-20 letters/digits/._#-+");
+  if (b.side !== "BUY" && b.side !== "SELL") throw new Error("side must be BUY or SELL");
+  const volume = num(b.volume);
+  if (volume === null || volume < TRADE_VOLUME_MIN || volume > TRADE_VOLUME_MAX)
+    throw new Error(`volume must be ${TRADE_VOLUME_MIN}..${TRADE_VOLUME_MAX} lots`);
+  // sane decimals — MT5 minimum step is 0.000001 on some brokers
+  // (epsilon compare: 0.01 * 1e6 is 10000.000000000002 in IEEE754)
+  const scaled = volume * 1e6;
+  if (Math.abs(Math.round(scaled) - scaled) > 1e-4) throw new Error("volume: max 6 decimals");
+  return { symbol, side: b.side, volume };
+}
+
+/** True when the reporting EA is new enough to receive trade commands. */
+export function eaSupportsTrading(eaVersion: string | null | undefined): boolean {
+  if (!eaVersion) return false;
+  const m = /^(\d+)\.(\d+)$/.exec(eaVersion);
+  if (!m) return false;
+  return Number(m[1]) * 100 + Number(m[2]) >= 200;
 }
 
 export interface JournalTradeDraft {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import TradePanel, { type PanelAccount } from "../mt5/trade-panel";
 
 /** Map a user-typed symbol to a TradingView symbol. */
 function tvSymbol(raw: string): string {
@@ -16,16 +17,40 @@ function tvSymbol(raw: string): string {
   return s;
 }
 
+/** TradingView-style symbol -> broker-style symbol for the MT5 trade panel. */
+function brokerSymbol(raw: string): string {
+  const s = raw.toUpperCase().trim();
+  return s.includes(":") ? s.split(":")[1]! : s;
+}
+
 export default function ChartsApp({ initialSymbol }: { initialSymbol: string }) {
   const [symbol, setSymbol] = useState(initialSymbol);
   const tvSym = tvSymbol(symbol);
   const fsRef = useRef<HTMLDivElement>(null);
   const [isFs, setIsFs] = useState(false);
+  const [accounts, setAccounts] = useState<PanelAccount[]>([]);
 
   useEffect(() => {
     const onFs = () => setIsFs(Boolean(document.fullscreenElement));
     document.addEventListener("fullscreenchange", onFs);
     return () => document.removeEventListener("fullscreenchange", onFs);
+  }, []);
+
+  // Quick-trade panel wiring: needs the user's MT5 accounts (chart works
+  // account-less too — panel simply stays hidden until one gets registered).
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const r = await fetch("/api/mt5/accounts");
+        if (!r.ok) return;
+        const d = (await r.json()) as { accounts?: PanelAccount[] };
+        if (!cancelled && d.accounts) setAccounts(d.accounts);
+      } catch { /* chart-only mode */ }
+    };
+    void load();
+    const t = setInterval(() => void load(), 30000);
+    return () => { cancelled = true; clearInterval(t); };
   }, []);
 
   const toggleFullscreen = async () => {
@@ -76,20 +101,24 @@ export default function ChartsApp({ initialSymbol }: { initialSymbol: string }) 
           <span className="text-amber-400 font-medium">Note:</span> cross-device account sync
           free widget me technically possible nahi (TradingView khud parent page ko drawing
           data nahi deta; wo unki licensed Charting Library ka feature hai). Yahan kuch bhi
-          fake nahi hai.
+          fake nahi hai. Click-se-trade ke entry arrows + floating P&L lines <a className="text-[var(--color-accent)] underline" href="/mt5">MT5 Sync → Trade Map</a> pe dikhte hain.
         </p>
       </div>
+
+      {accounts.length > 0 && (
+        <TradePanel accounts={accounts} initialSymbol={brokerSymbol(symbol)} />
+      )}
 
       {/* Official embed — bug #4 rule: embed-widget-advanced-chart.js inside
           .tradingview-widget-container. React double-mount guard via key. */}
       <div>
-        <TvEmbed key={`tv-${symbol}`} tvSym={tvSym} fullscreen={isFs} />
+        <TvEmbed key={`tv-${symbol}`} tvSym={tvSym} fullscreen={isFs} hasPanel={accounts.length > 0} />
       </div>
     </div>
   );
 }
 
-function TvEmbed({ tvSym, fullscreen }: { tvSym: string; fullscreen?: boolean }) {
+function TvEmbed({ tvSym, fullscreen, hasPanel }: { tvSym: string; fullscreen?: boolean; hasPanel?: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -116,6 +145,9 @@ function TvEmbed({ tvSym, fullscreen }: { tvSym: string; fullscreen?: boolean })
       interval: "D",
       timezone: "Etc/UTC",
       theme: "dark",
+      // MT5-terminal look: solid black background, near-invisible grid
+      backgroundColor: "#000000",
+      gridColor: "rgba(30, 30, 30, 1)",
       style: "1",
       locale: "en",
       allow_symbol_change: true,
@@ -136,9 +168,15 @@ function TvEmbed({ tvSym, fullscreen }: { tvSym: string; fullscreen?: boolean })
     <div className={`card p-1 ${fullscreen ? "border-0 !p-0" : ""}`}>
       <div
         ref={containerRef}
-        style={fullscreen
-          ? { height: "calc(100vh - 235px)", minHeight: 300 }
-          : { height: "calc(100vh - 300px)", minHeight: 560 }}
+        style={
+          fullscreen
+            ? hasPanel
+              ? { height: "calc(100vh - 400px)", minHeight: 240 }
+              : { height: "calc(100vh - 235px)", minHeight: 300 }
+            : hasPanel
+              ? { height: "calc(100vh - 480px)", minHeight: 360 }
+              : { height: "calc(100vh - 300px)", minHeight: 560 }
+        }
       />
     </div>
   );

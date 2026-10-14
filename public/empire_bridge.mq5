@@ -89,7 +89,7 @@ string JsonStr(const string obj, const string key)
    return StringSubstr(obj, q1 + 1, q2 - q1 - 1);
 }
 
-double JsonNum(const string obj, const string key, const bool &ok)
+double JsonNum(const string obj, const string key, bool &ok)
 {
    ok = false;
    string k = "\"" + key + "\"";
@@ -242,7 +242,6 @@ string RetcodeText(const uint code)
       case TRADE_RETCODE_CONNECTION:     return "no connection to trade server";
       case TRADE_RETCODE_TOO_MANY_REQUESTS: return "too many requests";
       case TRADE_RETCODE_LIMIT_VOLUME:   return "broker position/volume limit reached";
-      case 10015:                        return "invalid price";
    }
    return "retcode " + IntegerToString(code);
 }

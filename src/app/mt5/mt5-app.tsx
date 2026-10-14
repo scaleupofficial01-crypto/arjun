@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import TradeMap from "./trade-map";
+import EquityChart from "./equity-chart";
 import { buildRoundTrips } from "@/lib/trade-map";
 
 interface Account {
@@ -281,6 +282,9 @@ export default function Mt5App({ appUrl }: { appUrl: string }) {
                     </tbody>
                   </table>
                 </div>
+
+                <EquityChart deals={deals} />
+
                 <details className="text-xs">
                   <summary className="cursor-pointer text-[var(--color-muted)]">Raw deals ({deals.length}) — technical/audit view</summary>
                   <div className="overflow-x-auto max-h-60 overflow-y-auto mt-2">

@@ -29,9 +29,13 @@ type Candle = { time: number; open: number; high: number; low: number; close: nu
 const TOOLS: { id: Tool; label: string; hint: string }[] = [
   { id: "cursor", label: "⬙", hint: "cursor" },
   { id: "trendline", label: "╱", hint: "trendline — click 2 points" },
+  { id: "ray", label: "↗", hint: "ray — click 2 points, extends past the second" },
+  { id: "rect", label: "▭", hint: "rectangle — click 2 opposite corners" },
   { id: "hline", label: "—", hint: "horizontal line — click price" },
   { id: "vline", label: "│", hint: "vertical line — click time" },
 ];
+
+const TWO_CLICK_TOOLS = new Set<Tool>(["trendline", "ray", "rect"]);
 
 /**
  * Trade Map — synced MT5 deals on real market candles, TradingView-style:
@@ -74,6 +78,38 @@ export default function TradeMap({ deals, accountId }: { deals: MapDeal[]; accou
 
   /** Server persistence key for this chart (per account + symbol), like TV's layout per chart. */
   const layoutKey = accountId && current ? `mt5:${accountId}|${current.symbol}` : null;
+
+  /** Account-level chart interaction — the last symbol you had selected (TV remembers this too). */
+  const accountStateKey = accountId ? `mt5:${accountId}|__ACCOUNT__` : null;
+  const symbolStateLoadedRef = useRef(false);
+  useEffect(() => {
+    if (!accountStateKey || maps.length === 0) return;
+    const [scope, sym] = accountStateKey.split("|");
+    let cancelled = false;
+    fetch(`/api/charts/layout?scope=${encodeURIComponent(scope)}&symbol=${encodeURIComponent(sym)}`)
+      .then(async (r) => (r.ok ? ((await r.json()) as { data: { state?: { lastSymbol?: string } } | null }) : { data: null }))
+      .then(({ data }) => {
+        if (cancelled) return;
+        symbolStateLoadedRef.current = true;
+        const last = data && typeof data === "object" ? data.state?.lastSymbol : null;
+        if (last && maps.some((m) => m.symbol === last)) setSymbol(last);
+      })
+      .catch(() => { symbolStateLoadedRef.current = true; });
+    return () => { cancelled = true; };
+  }, [accountStateKey, maps]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const persistSelectedSymbol = useCallback(
+    (sym: string) => {
+      if (!accountStateKey || !symbolStateLoadedRef.current) return;
+      const [scope, s] = accountStateKey.split("|");
+      void fetch(`/api/charts/layout?scope=${encodeURIComponent(scope)}&symbol=${encodeURIComponent(s)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: { state: { lastSymbol: sym } } }),
+      }).catch(() => {});
+    },
+    [accountStateKey],
+  );
 
   // ---------- persistence ----------
   const persistNow = useCallback(async () => {
@@ -291,13 +327,14 @@ export default function TradeMap({ deals, accountId }: { deals: MapDeal[]; accou
         setTool("cursor");
         return;
       }
-      // trendline: two clicks
+      // two-click tools: trendline / ray / rectangle
+      if (!TWO_CLICK_TOOLS.has(active)) return;
       if (!pendingRef.current) {
         pendingRef.current = anchor;
         setPendingAnchorTime(anchor.time);
         return;
       }
-      const d = makeDrawing("trendline", [pendingRef.current, anchor]);
+      const d = makeDrawing(active as "trendline" | "ray" | "rect", [pendingRef.current, anchor]);
       pendingRef.current = null;
       setPendingAnchorTime(null);
       if (d) setDrawings((prev) => [...prev, d]);
@@ -388,6 +425,12 @@ export default function TradeMap({ deals, accountId }: { deals: MapDeal[]; accou
   };
   const drawingLabel = (d: Drawing) => {
     if (d.type === "trendline") return `trendline @ ${d.anchors[0].price.toFixed(2)}`;
+    if (d.type === "ray") return `ray from ${d.anchors[0].price.toFixed(2)}`;
+    if (d.type === "rect") {
+      const lo = Math.min(d.anchors[0].price, d.anchors[1].price).toFixed(2);
+      const hi = Math.max(d.anchors[0].price, d.anchors[1].price).toFixed(2);
+      return `rect ${lo}–${hi}`;
+    }
     if (d.type === "hline") return `hline ${d.anchors[0].price.toFixed(2)}`;
     return `vline ${new Date(d.anchors[0].time * 1000).toISOString().slice(0, 10)}`;
   };
@@ -405,7 +448,7 @@ export default function TradeMap({ deals, accountId }: { deals: MapDeal[]; accou
           {maps.map((m) => (
             <button
               key={m.symbol}
-              onClick={() => setSymbol(m.symbol)}
+              onClick={() => { setSymbol(m.symbol); persistSelectedSymbol(m.symbol); }}
               className={`px-2 py-0.5 text-xs rounded border transition ${current?.symbol === m.symbol ? "border-[var(--color-accent)] text-[var(--color-accent)]" : "border-[var(--color-border)] text-[var(--color-muted)]"}`}
             >
               {m.symbol}
@@ -429,10 +472,10 @@ export default function TradeMap({ deals, accountId }: { deals: MapDeal[]; accou
             {t.label}
           </button>
         ))}
-        {tool === "trendline" && pendingAnchorTime !== null && (
+        {TWO_CLICK_TOOLS.has(tool) && pendingAnchorTime !== null && (
           <span className="text-[var(--color-accent)]">first anchor set — click the second point</span>
         )}
-        {tool !== "cursor" && !(tool === "trendline" && pendingAnchorTime !== null) && (
+        {tool !== "cursor" && !(TWO_CLICK_TOOLS.has(tool) && pendingAnchorTime !== null) && (
           <span className="text-[var(--color-muted)]">click on chart…</span>
         )}
         <span className="ml-auto flex items-center gap-2 min-w-[120px] justify-end">

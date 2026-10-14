@@ -9,7 +9,7 @@
  * Units: `time` = unix seconds (UTC), `price` = number.
  */
 
-export type DrawingType = "trendline" | "hline" | "vline";
+export type DrawingType = "trendline" | "hline" | "vline" | "rect" | "ray";
 
 export interface Anchor {
   time: number; // unix seconds
@@ -19,7 +19,7 @@ export interface Anchor {
 export interface Drawing {
   id: string;
   type: DrawingType;
-  /** trendline: exactly 2 anchors; hline/vline: exactly 1. */
+  /** trendline/rect/ray: exactly 2 anchors; hline/vline: exactly 1. */
   anchors: Anchor[];
   color: string;
 }
@@ -53,7 +53,7 @@ function toAnchor(v: unknown): Anchor | null {
 }
 
 export function makeDrawing(type: DrawingType, anchors: Anchor[], color: string = DRAWING_COLORS[0]): Drawing | null {
-  const need = type === "trendline" ? 2 : 1;
+  const need = type === "hline" || type === "vline" ? 1 : 2;
   if (!Array.isArray(anchors) || anchors.length !== need) return null;
   const clean = anchors.map(toAnchor);
   if (clean.some((a) => a === null)) return null;
@@ -79,9 +79,9 @@ export function normalizeChartData(src: unknown): ChartData {
       if (!raw || typeof raw !== "object") continue;
       const d = raw as Record<string, unknown>;
       const type = d.type;
-      if (type !== "trendline" && type !== "hline" && type !== "vline") continue;
+      if (type !== "trendline" && type !== "hline" && type !== "vline" && type !== "rect" && type !== "ray") continue;
       const anchors = Array.isArray(d.anchors) ? d.anchors.map(toAnchor).filter((a) => a !== null) : [];
-      const need = type === "trendline" ? 2 : 1;
+      const need = type === "hline" || type === "vline" ? 1 : 2;
       if (anchors.length !== need) continue;
       out.drawings.push({
         id: typeof d.id === "string" && d.id.length >= 4 && d.id.length <= 64 ? d.id : newDrawingId(),
@@ -127,6 +127,33 @@ export function drawingToSegments(d: Drawing, bars: LineBars): Array<{ from: Anc
   if (d.type === "hline") {
     const p = d.anchors[0];
     return [{ from: { time: bars.minTime - PAD, price: p.price }, to: { time: bars.maxTime + PAD, price: p.price } }];
+  }
+  if (d.type === "rect") {
+    const [a, b] = d.anchors;
+    const t1 = Math.min(a.time, b.time), t2 = Math.max(a.time, b.time);
+    const p1 = Math.min(a.price, b.price), p2 = Math.max(a.price, b.price);
+    return [
+      { from: { time: t1, price: p1 }, to: { time: t2, price: p1 } }, // bottom
+      { from: { time: t1, price: p2 }, to: { time: t2, price: p2 } }, // top
+      { from: { time: t1, price: p1 }, to: { time: t1 + 60, price: p2 } }, // left
+      { from: { time: t2, price: p1 }, to: { time: t2 + 60, price: p2 } }, // right
+    ];
+  }
+  if (d.type === "ray") {
+    const [a, b] = d.anchors;
+    const lo = bars.minPrice - (bars.maxPrice - bars.minPrice) * 0.2;
+    const hi = bars.maxPrice + (bars.maxPrice - bars.minPrice) * 0.2;
+    if (a.time === b.time) {
+      // degenerate vertical ray → spans the price window (like a vline)
+      return [{ from: { time: a.time, price: lo }, to: { time: a.time + 60, price: hi } }];
+    }
+    const m = (b.price - a.price) / (b.time - a.time);
+    // ray starts at the first-clicked anchor and extends past the second one
+    const extendTo = b.time > a.time ? bars.maxTime + PAD : bars.minTime - PAD;
+    const t1 = Math.min(a.time, extendTo), t2 = Math.max(a.time, extendTo);
+    return [
+      { from: { time: t1, price: a.price + m * (t1 - a.time) }, to: { time: t2, price: a.price + m * (t2 - a.time) } },
+    ];
   }
   const t = d.anchors[0].time;
   const lo = bars.minPrice - (bars.maxPrice - bars.minPrice) * 0.2;

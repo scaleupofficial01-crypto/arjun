@@ -30,12 +30,15 @@ describe("normalizeChartData (untrusted DB payload)", () => {
       drawings: [
         { id: "drw_ok_1", type: "hline", anchors: [{ time: 5000, price: 4010.5 }], color: "#22c55e" },
         { id: "drw_ok_2", type: "trendline", anchors: [{ time: 1, price: 2 }, { time: 3, price: 4 }], color: "#f59e0b" },
+        { id: "drw_ok_3", type: "rect", anchors: [{ time: 1, price: 2 }, { time: 3, price: 4 }], color: "#f59e0b" },
+        { id: "drw_ok_4", type: "ray", anchors: [{ time: 1, price: 2 }, { time: 3, price: 4 }], color: "#f59e0b" },
       ],
       state: { visibleRange: { from: 10, to: 20 } },
     };
     const out = normalizeChartData(src);
-    expect(out.drawings).toHaveLength(2);
+    expect(out.drawings).toHaveLength(4);
     expect(out.drawings[0].color).toBe("#22c55e");
+    expect(out.drawings.map((x) => x.type)).toEqual(["hline", "trendline", "rect", "ray"]);
     expect(out.state.visibleRange).toEqual({ from: 10, to: 20 });
   });
   it("drops garbage instead of throwing", () => {
@@ -80,5 +83,31 @@ describe("drawingToSegments (renderable lines)", () => {
     expect(seg.to.time).toBeGreaterThan(seg.from.time);
     expect(seg.from.price).toBeLessThan(BARS.minPrice);
     expect(seg.to.price).toBeGreaterThan(BARS.maxPrice);
+  });
+  it("renders a rectangle as its four edges from opposite corners", () => {
+    const d = makeDrawing("rect", [p(2000, 20), p(1000, 10)])!;
+    const segs = drawingToSegments(d, BARS);
+    expect(segs).toHaveLength(4);
+    const prices = segs.flatMap((s) => [s.from.price, s.to.price]);
+    expect(Math.min(...prices)).toBe(10);
+    expect(Math.max(...prices)).toBe(20);
+    const times = segs.flatMap((s) => [s.from.time, s.to.time]);
+    expect(Math.min(...times)).toBe(1000);
+    expect(Math.max(...times)).toBeGreaterThanOrEqual(2000);
+  });
+  it("extends a ray past the second anchor in the drawn direction", () => {
+    const d = makeDrawing("ray", [p(1000, 10), p(2000, 20)])!; // slope +10/ks, drawn forward
+    const [seg] = drawingToSegments(d, BARS);
+    expect(seg.from.time).toBeLessThanOrEqual(1000);
+    expect(seg.to.time).toBeGreaterThan(BARS.maxTime); // extended beyond window
+    // slope preserved: price rises in the same direction as drawn
+    expect(seg.to.price).toBeGreaterThan(seg.from.price);
+    expect(makeDrawing("ray", [p(2000, 20), p(1000, 10)])).not.toBeNull(); // backward-drawn ok
+  });
+  it("keeps a degenerate vertical ray renderable", () => {
+    const d = makeDrawing("ray", [p(5000, 10), p(5000, 20)])!;
+    const [seg] = drawingToSegments(d, BARS);
+    expect(seg.to.time).toBeGreaterThan(seg.from.time);
+    expect(seg.to.price).toBeGreaterThan(seg.from.price);
   });
 });

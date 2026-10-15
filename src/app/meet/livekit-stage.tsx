@@ -112,7 +112,7 @@ export default function LiveKitStage({
           )}
         </div>
         <p className="text-[11px] text-center text-[var(--color-muted)]">
-          Share the room name — any signed-in Empire member can join inside. The access token
+          Share the room name — any Empire member can join inside. The access token
           expires in 2 hours.
         </p>
       </div>

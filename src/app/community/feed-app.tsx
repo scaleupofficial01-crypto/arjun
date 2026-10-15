@@ -85,14 +85,14 @@ export default function FeedApp({ posts, me }: { posts: Post[]; me: string }) {
         </div>
         {err && <p className="text-xs text-[var(--color-loss)]">{err}</p>}
         <p className="text-[10px] text-[var(--color-muted)]">
-          Visibility is enforced server-side — followers-only posts are visible to your followers alone.
+          Followers-only posts are visible to your followers.
         </p>
       </form>
 
       <div className="space-y-3">
         {posts.length === 0 && (
           <div className="card p-5 text-sm text-[var(--color-muted)]">
-            The feed is empty — make the first post
+            No posts yet.
           </div>
         )}
         {posts.map((p) => (

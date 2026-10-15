@@ -71,7 +71,7 @@ export default function MessagesApp({ items }: { items: Item[] }) {
         <h3 className="font-semibold">Your conversations</h3>
         {items.length === 0 && (
           <div className="card p-5 text-sm text-[var(--color-muted)]">
-            No conversations yet — start one above with any Empire member. All threads are members-only.
+            No conversations yet. All chat threads are private and members-only.
           </div>
         )}
         {items.map((it) => (

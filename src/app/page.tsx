@@ -9,9 +9,9 @@ const features = [
   ["Analytics", "Win rate, expectancy, profit factor, max drawdown vs true historical peak, equity curve."],
   ["Watchlists & Alerts", "Multiple watchlists and price alerts that fire from real price data only."],
   ["MT5 Sync", "Two-way sync with your MT5 account via read-only bridge — no master password ever."],
-  ["Messenger", "Pro DM-style chat: groups, reactions, read receipts, chart sharing."],
+  ["Messenger", "Private 1:1 and group chats with unread tracking — members-only threads."],
   ["Empire Meet", "Fully in-app video meetings with screen share. No external links."],
-  ["Community", "Trader profiles, follows, analysis posts, groups, server-side visibility rules."],
+  ["Community", "Trader profiles, follows, and analysis posts with enforced visibility rules."],
 ] as const;
 
 export default function Home() {

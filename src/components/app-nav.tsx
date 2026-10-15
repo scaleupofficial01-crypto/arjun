@@ -56,7 +56,6 @@ export default async function AppNav({ active }: { active: string }) {
         <Link href="/notifications" className="text-sm text-[var(--color-muted)] hover:text-white">
           🔔{unread > 0 && <span className="ml-1 text-[var(--color-accent)] font-semibold">{unread}</span>}
         </Link>
-        {isDemo && <span className="badge badge-demo">Demo</span>}
       </div>
     </nav>
   );

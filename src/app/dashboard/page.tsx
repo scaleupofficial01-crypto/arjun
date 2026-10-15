@@ -32,14 +32,7 @@ export default async function DashboardPage() {
 
   return (
     <main className="min-h-screen max-w-6xl mx-auto px-6 py-8 space-y-8">
-      {isDemo && (
-        <div className="card p-4 border-amber-500/40 bg-amber-500/5 text-sm">
-          <span className="badge badge-demo mr-2">Shared workspace</span>
-          No login needed — you are working in a shared demo workspace. Every
-          feature below is fully functional; data here is demo data anyone with
-          the link can see.
-        </div>
-      )}
+      {/* Guest sessions land here directly — no banner, no gate copy. */}
 
       {/* ── 3D hero: the 10-level golden staircase rises behind the title ── */}
       <section className="card relative overflow-hidden p-0 h-52 md:h-60">

@@ -1,6 +1,4 @@
 import { randomUUID } from "crypto";
-import { mkdir, writeFile } from "fs/promises";
-import { join } from "path";
 import { getDb } from "@/lib/db";
 import { json, requireUser, notFound } from "@/lib/api";
 import { csrfDenied, rateLimit, rateLimited } from "@/lib/security";
@@ -18,7 +16,8 @@ const ALLOWED: Record<string, string> = {
 const MAX_SIZE = 5 * 1024 * 1024;
 
 export function uploadsRoot(): string {
-  return join(process.cwd(), "uploads");
+  // Legacy disk root kept only for serving pre-DB uploads (new uploads are in Postgres).
+  return `${process.cwd()}/uploads`;
 }
 
 export async function GET(req: Request, ctx: Ctx) {
@@ -35,9 +34,8 @@ export async function GET(req: Request, ctx: Ctx) {
   return json({ attachments: trade.attachments });
 }
 
-/** Upload a chart screenshot for a trade (stored on local disk; served only
- *  via the ownership-checked /api/files route). Supabase Storage is the
- *  production target — swap uploadsRoot serving when configured. */
+/** Upload a chart screenshot for a trade. Bytes are stored in Postgres
+ *  (Attachment.data) and served via the ownership-checked /api/files route. */
 export async function POST(req: Request, ctx: Ctx) {
   const csrf = csrfDenied(req);
   if (csrf) return csrf;
@@ -64,10 +62,10 @@ export async function POST(req: Request, ctx: Ctx) {
 
   const fileName = `${randomUUID()}.${ext}`;
   const relPath = `${auth.user.id}/${trade.id}/${fileName}`;
-  const absDir = join(uploadsRoot(), auth.user.id, trade.id);
-  await mkdir(absDir, { recursive: true });
-  await writeFile(join(absDir, fileName), Buffer.from(await file.arrayBuffer()));
+  const bytes = Buffer.from(await file.arrayBuffer());
 
+  // Durable by design: image bytes go straight into Postgres (Vercel disk is
+  // ephemeral), so screenshots persist across deploys and devices forever.
   const attachment = await db.attachment.create({
     data: {
       tradeId: trade.id,
@@ -75,6 +73,7 @@ export async function POST(req: Request, ctx: Ctx) {
       mime: file.type,
       size: file.size,
       path: relPath,
+      data: bytes,
     },
   });
   return json({ attachment }, { status: 201 });

@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import TradeMap, { type MapPosition } from "./trade-map";
 import EquityChart from "./equity-chart";
-import TradePanel from "./trade-panel";
 import { buildRoundTrips } from "@/lib/trade-map";
 
 interface Account {
@@ -157,7 +156,7 @@ export default function Mt5App({ appUrl }: { appUrl: string }) {
 
       <div className="card p-4 text-xs text-[var(--color-muted)] space-y-1">
         <p><b className="text-white">How it works:</b> Your MT5 login/password never leaves your PC. A tiny EA (<a className="text-[var(--color-accent)] underline" href="/empire_bridge.mq5" download>empire_bridge.mq5</a>) running in your terminal pushes account data, live quotes and positions here with a scoped per-account token.</p>
-        <p><b className="text-white">Trading (v2):</b> click SELL/BUY here → the server just queues your intent → your own terminal executes it as a <b>market order</b> and reports the broker verdict (fill ticket or rejection reason) back. Passwords can never be stored on the server.</p>
+        
         <p><b className="text-white">Honest status:</b> until an EA actually connects, every account shows “waiting for first sync” — nothing here is simulated, not even prices.</p>
       </div>
 
@@ -257,19 +256,7 @@ export default function Mt5App({ appUrl }: { appUrl: string }) {
               </tbody>
             </table>
           </div>
-          <h3 className="text-sm font-medium text-[var(--color-accent)]">Quick trade — terminal ke andar market order (EA v2)</h3>
-          <TradePanel
-            accounts={[{
-              id: detail.account.id,
-              label: detail.account.label,
-              login: detail.account.login,
-              server: detail.account.server,
-              eaVersion: detail.account.eaVersion,
-              lastSyncAt: detail.account.lastSyncAt,
-            }]}
-            initialSymbol={detail.positions[0]?.symbol ?? detail.deals[0]?.symbol ?? "XAUUSD"}
-            onTraded={() => void openDetail(detail.account.id)}
-          />
+          
 
           <h3 className="text-sm font-medium text-[var(--color-accent)]">Chart — open positions + your trades on real market candles</h3>
           <TradeMap

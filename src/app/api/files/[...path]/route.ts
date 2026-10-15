@@ -22,6 +22,26 @@ export async function GET(req: Request, ctx: Ctx) {
   const [ownerId, tradeId, fileName] = path;
   if (ownerId !== auth.user.id && auth.user.role !== "ADMIN") return forbidden();
 
+  // Primary source: Postgres (durable across serverless deploys).
+  try {
+    const { getDb } = await import("@/lib/db");
+    const db = getDb();
+    if (db) {
+      const att = await db.attachment.findFirst({
+        where: { path: `${ownerId}/${tradeId}/${fileName}` },
+        select: { data: true, mime: true },
+      });
+      if (att?.data && att.data.length > 0) {
+        return new Response(new Uint8Array(att.data), {
+          headers: { "Content-Type": att.mime, "Cache-Control": "private, max-age=31536000, immutable" },
+        });
+      }
+    }
+  } catch {
+    /* fall through to legacy disk */
+  }
+
+  // Legacy fallback: local-preview era files on disk.
   const abs = normalize(join(uploadsRoot(), ownerId, tradeId, fileName));
   if (!abs.startsWith(normalize(uploadsRoot()))) return notFound(); // path traversal guard
   try {

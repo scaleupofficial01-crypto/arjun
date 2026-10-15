@@ -181,6 +181,7 @@ model Attachment {
   mime      String
   size      Int
   path      String // userId/tradeId/random — served only via ownership-checked route
+  data      Bytes?   @db.ByteA // image bytes live in Postgres — permanent on Vercel too
   createdAt DateTime @default(now())
 
   @@index([tradeId])

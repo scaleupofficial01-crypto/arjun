@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import TradePanel, { type PanelAccount } from "../mt5/trade-panel";
 
 /** Map a user-typed symbol to a TradingView symbol. */
 function tvSymbol(raw: string): string {
@@ -28,29 +27,11 @@ export default function ChartsApp({ initialSymbol }: { initialSymbol: string }) 
   const tvSym = tvSymbol(symbol);
   const fsRef = useRef<HTMLDivElement>(null);
   const [isFs, setIsFs] = useState(false);
-  const [accounts, setAccounts] = useState<PanelAccount[]>([]);
 
   useEffect(() => {
     const onFs = () => setIsFs(Boolean(document.fullscreenElement));
     document.addEventListener("fullscreenchange", onFs);
     return () => document.removeEventListener("fullscreenchange", onFs);
-  }, []);
-
-  // Quick-trade panel wiring: needs the user's MT5 accounts (chart works
-  // account-less too — panel simply stays hidden until one gets registered).
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const r = await fetch("/api/mt5/accounts");
-        if (!r.ok) return;
-        const d = (await r.json()) as { accounts?: PanelAccount[] };
-        if (!cancelled && d.accounts) setAccounts(d.accounts);
-      } catch { /* chart-only mode */ }
-    };
-    void load();
-    const t = setInterval(() => void load(), 30000);
-    return () => { cancelled = true; clearInterval(t); };
   }, []);
 
   const toggleFullscreen = async () => {
@@ -90,14 +71,10 @@ export default function ChartsApp({ initialSymbol }: { initialSymbol: string }) 
         </button>
       </div>
 
-      {accounts.length > 0 && (
-        <TradePanel accounts={accounts} initialSymbol={brokerSymbol(symbol)} />
-      )}
-
       {/* Official embed — bug #4 rule: embed-widget-advanced-chart.js inside
           .tradingview-widget-container. React double-mount guard via key. */}
       <div>
-        <TvEmbed key={`tv-${symbol}`} tvSym={tvSym} fullscreen={isFs} hasPanel={accounts.length > 0} />
+        <TvEmbed key={`tv-${symbol}`} tvSym={tvSym} fullscreen={isFs} hasPanel={false} />
       </div>
     </div>
   );

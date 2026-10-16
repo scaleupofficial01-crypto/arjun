@@ -299,7 +299,7 @@ export default function JournalApp({
                         <td className="p-3 text-[var(--color-muted)]">{t.exitAt ? new Date(t.exitAt).toLocaleDateString() : "—"}</td>
                         <td className="p-3 whitespace-nowrap">
                           <button className="px-1" title="Edit" onClick={() => setEditId(t.id)}>✏️</button>
-                          <button className="px-1" title="Screenshots/notes" onClick={() => setOpenAttachTrade(openAttachTrade === t.id ? null : t.id)}>📎{t.attachments.length > 0 ? t.attachments.length : ""}</button>
+                          <button className="px-1 text-xs whitespace-nowrap" title="Trade photos (chart / entry / mistake proof)" onClick={() => setOpenAttachTrade(openAttachTrade === t.id ? null : t.id)}>📷 Photos{t.attachments.length > 0 ? ` (${t.attachments.length})` : ""}</button>
                           <button className="px-1" title="Delete" onClick={() => deleteTrade(t.id)}>🗑️</button>
                         </td>
                       </tr>
@@ -348,7 +348,7 @@ function AttachmentPanel({ trade, onUpload, onClose }: {
         {trade.attachments.length === 0 && <p className="text-[var(--color-muted)]">No screenshots yet.</p>}
       </div>
       <label className="inline-block px-3 py-1.5 rounded-lg border border-[var(--color-border)] hover:border-[var(--color-accent)] cursor-pointer">
-        + Upload screenshot
+        + Add photo
         <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={(e) => onUpload(trade.id, e)} />
       </label>
     </div>

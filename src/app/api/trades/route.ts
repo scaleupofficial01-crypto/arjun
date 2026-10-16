@@ -7,7 +7,7 @@ import { csrfDenied, rateLimit, rateLimited } from "@/lib/security";
 
 export const runtime = "nodejs";
 
-const num = z.string().regex(/^\d+(\.\d+)?$/, "must be a positive number");
+const num = z.string().regex(/^\d[\d,]*(\.\d+)?$/, "must be a positive number");
 const createSchema = z.object({
   journalId: z.string().min(1),
   groupId: z.string().min(1).nullable().optional(),
@@ -18,8 +18,9 @@ const createSchema = z.object({
   quantity: num,
   risk: num.nullable().optional(),
   fees: num.nullable().optional(),
-  entryAt: z.string().datetime({ offset: true }).nullable().optional(),
-  exitAt: z.string().datetime({ offset: true }).nullable().optional(),
+  // datetime-local values arrive in several shapes — only require parseability.
+  entryAt: z.string().refine((v) => !Number.isNaN(Date.parse(v)), "entry time is not a valid date").nullable().optional(),
+  exitAt: z.string().refine((v) => !Number.isNaN(Date.parse(v)), "exit time is not a valid date").nullable().optional(),
   setupTag: z.string().max(60).nullable().optional(),
   notes: z.string().max(4000).nullable().optional(),
 });
@@ -85,8 +86,11 @@ export async function POST(req: Request) {
   if (!rl.ok) return rateLimited(rl);
 
   const parsed = createSchema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) return badRequest("Invalid trade data");
+  if (!parsed.success)
+    return badRequest(`Invalid trade data: ${parsed.error.issues[0]?.message ?? "check the form fields"}`);
   const d = parsed.data;
+  // UI can send formatted numbers ("4,152.23") — strip thousands separators.
+  const cleanNum = (v?: string | null) => (typeof v === "string" ? v.replace(/,/g, "") : v);
 
   const db = getDb();
   if (!db) return json({ error: "Database not configured", code: "setup-required" }, { status: 503 });
@@ -109,10 +113,10 @@ export async function POST(req: Request) {
   const pnl = hasExit
     ? computePnl({
         side: d.side,
-        entryPrice: d.entryPrice,
-        exitPrice: d.exitPrice,
-        quantity: d.quantity,
-        fees: d.fees,
+        entryPrice: cleanNum(d.entryPrice)!,
+        exitPrice: cleanNum(d.exitPrice),
+        quantity: cleanNum(d.quantity)!,
+        fees: cleanNum(d.fees),
       })
     : null;
 
@@ -123,11 +127,11 @@ export async function POST(req: Request) {
       groupId: d.groupId ?? null,
       symbol: d.symbol.toUpperCase().trim(),
       side: d.side,
-      entryPrice: d.entryPrice,
-      exitPrice: d.exitPrice ?? null,
-      quantity: d.quantity,
-      risk: d.risk ?? null,
-      fees: d.fees ?? "0",
+      entryPrice: cleanNum(d.entryPrice)!,
+      exitPrice: cleanNum(d.exitPrice) ?? null,
+      quantity: cleanNum(d.quantity)!,
+      risk: cleanNum(d.risk) ?? null,
+      fees: cleanNum(d.fees) ?? "0",
       pnl,
       status: hasExit ? "CLOSED" : "OPEN",
       setupTag: d.setupTag ?? null,

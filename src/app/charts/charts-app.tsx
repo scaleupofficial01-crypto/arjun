@@ -132,12 +132,8 @@ function TvEmbed({ tvSym, fullscreen, hasPanel }: { tvSym: string; fullscreen?: 
         ref={containerRef}
         style={
           fullscreen
-            ? hasPanel
-              ? { height: "calc(100vh - 400px)", minHeight: 240 }
-              : { height: "calc(100vh - 235px)", minHeight: 300 }
-            : hasPanel
-              ? { height: "calc(100vh - 480px)", minHeight: 360 }
-              : { height: "calc(100vh - 300px)", minHeight: 560 }
+            ? { height: "calc(100vh - 120px)", minHeight: 300 }
+            : { height: "calc(100vh - 150px)", minHeight: 560 }
         }
       />
     </div>

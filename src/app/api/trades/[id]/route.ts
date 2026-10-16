@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-const num = z.string().regex(/^\d+(\.\d+)?$/);
+const num = z.string().regex(/^\d[\d,]*(\.\d+)?$/);
 const patchSchema = z.object({
   groupId: z.string().min(1).nullable().optional(),
   symbol: z.string().min(1).max(20).optional(),
@@ -18,8 +18,8 @@ const patchSchema = z.object({
   quantity: num.optional(),
   risk: num.nullable().optional(),
   fees: num.nullable().optional(),
-  entryAt: z.string().datetime({ offset: true }).nullable().optional(),
-  exitAt: z.string().datetime({ offset: true }).nullable().optional(),
+  entryAt: z.string().refine((v) => !Number.isNaN(Date.parse(v)), "entry time is not a valid date").nullable().optional(),
+  exitAt: z.string().refine((v) => !Number.isNaN(Date.parse(v)), "exit time is not a valid date").nullable().optional(),
   setupTag: z.string().max(60).nullable().optional(),
   notes: z.string().max(4000).nullable().optional(),
 });
@@ -31,7 +31,8 @@ export async function PATCH(req: Request, ctx: Ctx) {
   if (auth instanceof Response) return auth;
   const { id } = await ctx.params;
   const parsed = patchSchema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) return badRequest("Invalid trade data");
+  if (!parsed.success)
+    return badRequest(`Invalid trade data: ${parsed.error.issues[0]?.message ?? "check the form fields"}`);
   const d = parsed.data;
 
   const db = getDb();
@@ -50,12 +51,14 @@ export async function PATCH(req: Request, ctx: Ctx) {
     if (!group) return badRequest("Group does not belong to this journal");
   }
 
+  // UI can send formatted numbers ("4,152.23") — strip thousands separators.
+  const cleanNum = (v: string | null | undefined) => (typeof v === "string" ? v.replace(/,/g, "") : v);
   const side = d.side ?? existing.side;
-  const entryPrice = d.entryPrice ?? existing.entryPrice.toString();
+  const entryPrice = d.entryPrice !== undefined ? cleanNum(d.entryPrice)! : existing.entryPrice.toString();
   const exitPrice =
-    d.exitPrice === undefined ? existing.exitPrice?.toString() ?? null : d.exitPrice;
-  const quantity = d.quantity ?? existing.quantity.toString();
-  const fees = d.fees === undefined ? existing.fees.toString() : d.fees ?? "0";
+    d.exitPrice === undefined ? existing.exitPrice?.toString() ?? null : cleanNum(d.exitPrice);
+  const quantity = d.quantity !== undefined ? cleanNum(d.quantity)! : existing.quantity.toString();
+  const fees = d.fees === undefined ? existing.fees.toString() : cleanNum(d.fees) ?? "0";
 
   const hasExit = Boolean(exitPrice);
   const pnl = hasExit ? computePnl({ side, entryPrice, exitPrice, quantity, fees }) : null;
@@ -69,7 +72,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
       entryPrice,
       exitPrice,
       quantity,
-      risk: d.risk === undefined ? existing.risk : d.risk,
+      risk: d.risk === undefined ? existing.risk : cleanNum(d.risk),
       fees,
       pnl,
       status: hasExit ? "CLOSED" : "OPEN",

@@ -45,6 +45,7 @@ export default function JournalApp({
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [formPhotos, setFormPhotos] = useState<File[]>([]);
   const [editId, setEditId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [openAttachTrade, setOpenAttachTrade] = useState<string | null>(null);
@@ -109,10 +110,26 @@ export default function JournalApp({
       exitAt: fd.get("exitAt") ? new Date(String(fd.get("exitAt"))).toISOString() : null,
       setupTag: fd.get("setupTag") || null, notes: fd.get("notes") || null,
     };
-    if (await run(() => jsonPost("/api/trades", body), "Add failed")) {
-      (e.target as HTMLFormElement).reset();
-      setShowForm(false);
+    setBusy(true); setError(null);
+    const r = await jsonPost("/api/trades", body);
+    if (!r.ok) { setBusy(false); setError(r.data.error ?? "Add failed"); return; }
+    // Attach any photos picked in the form — chart / entry / mistake proof.
+    const tid = (r.data as { trade?: { id?: string } }).trade?.id;
+    let uploadsFailed = 0;
+    if (tid && formPhotos.length) {
+      for (const ph of formPhotos) {
+        const u = new FormData();
+        u.append("file", ph);
+        const ur = await api(`/api/trades/${tid}/attachments`, { method: "POST", body: u });
+        if (!ur.ok) uploadsFailed++;
+      }
     }
+    setBusy(false);
+    if (uploadsFailed) setError(`${uploadsFailed} photo failed to upload — re-add them from the trade's 📷 Photos button`);
+    (e.target as HTMLFormElement).reset();
+    setFormPhotos([]);
+    setShowForm(false);
+    refresh();
   }
   async function saveEdit(e: React.FormEvent<HTMLFormElement>, t: Trade) {
     e.preventDefault();
@@ -241,6 +258,19 @@ export default function JournalApp({
                 <label className="text-[var(--color-muted)] text-xs sm:col-span-2">Entry time<input name="entryAt" type="datetime-local" className="input mt-1" /></label>
                 <label className="text-[var(--color-muted)] text-xs sm:col-span-2">Exit time<input name="exitAt" type="datetime-local" className="input mt-1" /></label>
                 <input name="notes" className="input sm:col-span-4" placeholder="Notes" />
+                <label className="text-[var(--color-muted)] text-xs sm:col-span-4">
+                  📷 Photos — chart / entry / mistake proof (up to 4, image files only)
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/gif"
+                    multiple
+                    className="input mt-1 !py-1.5 text-xs"
+                    onChange={(e) => setFormPhotos(Array.from(e.target.files ?? []).slice(0, 4))}
+                  />
+                  {formPhotos.length > 0 && (
+                    <span className="ml-2 text-[var(--color-profit)]">{formPhotos.length} photo{formPhotos.length === 1 ? "" : "s"} selected</span>
+                  )}
+                </label>
                 <div className="sm:col-span-4 flex gap-2">
                   <button className="btn-primary" disabled={busy}>{busy ? "Saving…" : "Save trade"}</button>
                   <button type="button" className="px-4 py-2 rounded-lg border border-[var(--color-border)]" onClick={() => setShowForm(false)}>Cancel</button>
